@@ -1,17 +1,22 @@
 import SwiftUI
 import AppKit
+#if !APPSTORE
 import Sparkle
+#endif
 
 @main
 struct FontManagerApp: App {
-    private let helpURL = URL(string: "https://github.com/treyhardin/font-manager")!
+    #if !APPSTORE
     @StateObject private var updaterModel = UpdaterViewModel()
+    #endif
     @StateObject private var toastCenter: ToastCenter
     @StateObject private var fontService: FontService
     @StateObject private var conversion: ConversionManager
     @StateObject private var mcpController = MCPServerController()
 
     init() {
+        WelcomeView.skipForExistingUsers()
+        AppTips.configure()
         let toast = ToastCenter()
         _toastCenter = StateObject(wrappedValue: toast)
         _fontService = StateObject(wrappedValue: FontService(toast: toast))
@@ -24,8 +29,10 @@ struct FontManagerApp: App {
                 .environmentObject(fontService)
                 .environmentObject(conversion)
                 .environmentObject(toastCenter)
-                .environmentObject(updaterModel)
                 .environmentObject(mcpController)
+                #if !APPSTORE
+                .environmentObject(updaterModel)
+                #endif
                 .task {
                     mcpController.fontService = fontService
                     mcpController.startIfEnabled()
@@ -34,9 +41,11 @@ struct FontManagerApp: App {
         .windowStyle(.titleBar)
         .defaultSize(width: 1000, height: 700)
         .commands {
+            #if !APPSTORE
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: updaterModel.updater)
             }
+            #endif
             CommandGroup(after: .newItem) {
                 Button("Convert a Font…") {
                     conversion.showConvert = true
@@ -44,12 +53,11 @@ struct FontManagerApp: App {
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .help) {
-                Button("Font Manager Help") {
-                    NSWorkspace.shared.open(helpURL)
+                Button("Welcome to Font Manager") {
+                    UserDefaults.standard.set(false, forKey: WelcomeView.hasSeenKey)
                 }
-                Button("Report an Issue…") {
-                    NSWorkspace.shared.open(helpURL.appendingPathComponent("issues"))
-                }
+                Divider()
+                AcknowledgementsCommand()
             }
             CommandGroup(after: .textEditing) {
                 Button("Find") {
@@ -60,8 +68,16 @@ struct FontManagerApp: App {
         }
 
         Settings {
-            SettingsView(updater: updaterModel.updater)
+            SettingsView()
                 .environmentObject(mcpController)
+                #if !APPSTORE
+                .environmentObject(updaterModel)
+                #endif
         }
+
+        Window("Acknowledgements", id: AcknowledgementsView.windowID) {
+            AcknowledgementsView()
+        }
+        .windowResizability(.contentSize)
     }
 }

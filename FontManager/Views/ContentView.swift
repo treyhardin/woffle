@@ -5,9 +5,12 @@ struct ContentView: View {
     @EnvironmentObject var fontService: FontService
     @EnvironmentObject var conversion: ConversionManager
     @EnvironmentObject var toastCenter: ToastCenter
+    #if !APPSTORE
     @EnvironmentObject var updaterModel: UpdaterViewModel
+    #endif
     @State private var isDropTargeted = false
     @State private var showingDirectories = false
+    @AppStorage(WelcomeView.hasSeenKey) private var hasSeenWelcome = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Opening a font: the detail rises in from slightly smaller while the grid recedes
@@ -55,6 +58,7 @@ struct ContentView: View {
         .toolbar {
             // The badge keeps its own prominent fill — hide the shared glass container
             // macOS Tahoe would otherwise draw around the toolbar item.
+            #if !APPSTORE
             if #available(macOS 26.0, *) {
                 ToolbarItem(placement: .primaryAction) {
                     UpdateAvailableButton(model: updaterModel)
@@ -67,6 +71,7 @@ struct ContentView: View {
                         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: updaterModel.updateAvailable)
                 }
             }
+            #endif
             // Status shows as bare text on the toolbar — no glass container (macOS Tahoe
             // draws one by default), and a spacer keeps it out of the buttons' container.
             if #available(macOS 26.0, *) {
@@ -103,6 +108,10 @@ struct ContentView: View {
         .toolbarRole(.editor)
         .sheet(isPresented: $showingDirectories) {
             DirectoriesView()
+        }
+        .sheet(isPresented: Binding(get: { !hasSeenWelcome }, set: { if !$0 { hasSeenWelcome = true } })) {
+            WelcomeView()
+                .environmentObject(fontService)
         }
         .sheet(isPresented: $conversion.showConvert) {
             ConvertView()

@@ -1,9 +1,11 @@
 import SwiftUI
+import TipKit
 
 struct FontListView: View {
     @EnvironmentObject var fontService: FontService
     @FocusState private var searchFocused: Bool
     @ScaledMetric(relativeTo: .body) private var styleGlyphSize: CGFloat = 15
+    private let actionsTip = SidebarActionsTip()
     var body: some View {
         VStack(spacing: 0) {
             // Compact filter header
@@ -68,6 +70,9 @@ struct FontListView: View {
             .padding(8)
 
             Divider()
+
+            TipView(actionsTip)
+                .padding(8)
 
             if fontService.filteredFonts.isEmpty {
                 emptyState
@@ -448,8 +453,10 @@ struct FontRowView: View {
         }
         .padding(.vertical, 2)
         .contextMenu {
-            Button(font.isActive ? "Deactivate" : "Activate") {
-                fontService.toggleFont(font)
+            if font.canToggleActivation {
+                Button(font.isActive ? "Deactivate" : "Activate") {
+                    fontService.toggleFont(font)
+                }
             }
             // Selects every file backing the family (deduped — styles can share one .ttc).
             let fileURLs = Array(Set(font.members.compactMap(\.fileURL)))

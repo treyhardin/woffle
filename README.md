@@ -46,6 +46,8 @@ check finds one (toggle in **Settings → Updates**).
   persists across launches. The sidebar stays A–Z, with an **A–Z bar** beside the scroll
   bar while you scroll — click or drag it to jump to a letter.
 - **Show in Finder** — right-click any family in the sidebar to reveal its font files.
+- **Welcome and tips** — a short first-launch welcome, a nudge to add your own fonts, and a
+  couple of one-time tips.
 - **Card grid** — browse all fonts as specimen cards with your own live preview text;
   click any card for full detail.
 - **Auto-sync** — source folders are watched, so fonts you drop in appear automatically,
@@ -58,7 +60,8 @@ check finds one (toggle in **Settings → Updates**).
 - **Group** fonts by family, collection, or source directory.
 - **Download as…** — export any font to your choice of format (desktop OTF/TTF,
   WOFF, or WOFF2), per style or the whole family at once. Conversion is invisible:
-  pick a format and you get the file.
+  pick a format and you get the file. (Apple's built-in system fonts are excluded — their
+  license covers use on your Mac only.)
 - **Convert fonts in either direction** — the **Convert** sheet lets you upload a
   font, detects its format, and offers one-click downloads in the other formats
   (WOFF, WOFF2, OTF, TTF). Or drop font files onto the window to add them to your

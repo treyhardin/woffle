@@ -35,7 +35,10 @@ General rules and patterns are in `../tc-agent/.claude/rules/`.
 ```
 FontManager/
 ├── FontManagerApp.swift            # App entry point + menu commands
-├── FontManager.entitlements        # App sandbox disabled (needed for font APIs)
+├── FontManager.entitlements        # Open-source build: not sandboxed
+├── FontManager-AppStore.entitlements # App Store build: sandboxed (+ bookmarks, network server)
+├── PrivacyInfo.xcprivacy           # Privacy manifest (UserDefaults, file timestamps)
+├── Resources/Acknowledgements.txt  # Third-party notices (scripts/generate-acknowledgements.sh)
 ├── FontManager-Bridging-Header.h   # Exposes WOFF2Kit to Swift
 ├── Models/
 │   └── FontItem.swift              # FontItem and FontMember data models
@@ -45,10 +48,16 @@ FontManager/
 │   ├── FontDetailView.swift        # Detail pane: preview + Download menus
 │   ├── DirectoriesView.swift       # Browse fonts by source directory
 │   ├── ConversionToast.swift       # Progress/result toast
-│   ├── AlphabetScrubber.swift      # Sidebar A–Z jump bar + scroll-wheel observer
+│   ├── AlphabetScrubber.swift      # A–Z jump bar (sidebar + browse pane)
+│   ├── WelcomeView.swift           # First-launch welcome + Get Started banner
+│   ├── Tips.swift                  # TipKit contextual tips
+│   ├── SettingsView.swift          # Settings (Updates section open-source only)
+│   ├── UpdaterViews.swift          # Sparkle — compiled out of the App Store build
+│   ├── AcknowledgementsView.swift  # Help → Acknowledgements window
 │   └── PhIcon.swift                # Ph enum + PhIcon/PhLabel for vendored Phosphor icons
 └── Services/
     ├── FontService.swift           # Enumeration, activation, imported fonts, filtering
+    ├── BookmarkStore.swift         # Security-scoped bookmarks for folders/imports
     ├── FontClassifier.swift        # Serif/sans/script… from CoreText traits + PANOSE
     ├── FontConversionEngine.swift  # Pure SFNT/WOFF plumbing (no app types)
     ├── FontConversionService.swift # Member-aware export/convert bridge
@@ -78,6 +87,26 @@ SF Symbols, so they take an explicit point size and don't auto-scale to font. Me
 checkmarks intentionally stay SF Symbols (`checkmark`) since macOS manages their layout.
 To add an icon: drop `assets/regular/<name>.svg` from `phosphor-icons/core` into a new
 `ph-<name>.imageset` and add a `Ph` case.
+
+## Two builds
+
+One codebase, two app targets in `project.yml` (sources shared):
+
+- **`FontManager`** — open-source build (GitHub download / Homebrew). Not sandboxed;
+  Sparkle auto-updates; `scripts/release.sh`.
+- **`FontManagerAppStore`** — Mac App Store build. Sandboxed, no Sparkle (the App Store
+  updates it), `APPSTORE` compile flag. Debug builds are named "Font Manager (App Store)"
+  so they don't overwrite the other app; Release keeps the real name.
+
+Put anything build-specific behind `#if APPSTORE`; prefer shared code that works in both
+(e.g. folder/import access always goes through `BookmarkStore`, which is required in the
+sandbox and harmless outside it). Both builds share a bundle ID, so macOS migrates the
+open-source build's preferences into the App Store sandbox on first launch.
+
+Rules both builds follow: Apple-supplied fonts (anything under `/System/`) are never
+exported or converted (`FontMember.isExportable`, enforced in `FontConversionService`);
+only fonts the app registers (source folders, imports) can be activated/deactivated
+(`FontItem.canToggleActivation`); no links to the GitHub download inside the app.
 
 ## Font conversion
 

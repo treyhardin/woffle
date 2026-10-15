@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppKit
 
 /// SwiftUI-facing controller for the MCP server: owns the enabled/port settings,
 /// starts/stops the underlying `FontMCPServer`, and publishes status + reachable URLs
@@ -39,6 +40,31 @@ final class MCPServerController: ObservableObject {
     }
 
     private var server: FontMCPServer?
+
+    #if APPSTORE
+    /// Folder `get_font` may write into via `destination`. The sandbox only allows writing
+    /// where the user has granted access, so they choose it here (source folders work too).
+    @Published private(set) var deliveryFolder: String? = UserDefaults.standard.string(forKey: FontMCPTools.deliveryFolderKey)
+    private let deliveryAccess = BookmarkStore(defaultsKey: "mcp.deliveryFolderBookmark")
+
+    init() {
+        if let deliveryFolder { deliveryAccess.startAccessing([deliveryFolder]) }
+    }
+
+    func chooseDeliveryFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Choose"
+        panel.message = "Choose a folder where AI tools can save fonts on this Mac"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        if let old = deliveryFolder { deliveryAccess.remove(old) }
+        deliveryAccess.add(url)
+        deliveryFolder = url.path
+        UserDefaults.standard.set(url.path, forKey: FontMCPTools.deliveryFolderKey)
+    }
+    #endif
 
     /// The catalog the server exposes. Set by the app before `startIfEnabled()`.
     var fontService: FontService?

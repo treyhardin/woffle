@@ -29,6 +29,7 @@ enum FontConversionError: LocalizedError {
     case unsupportedFormat(String)
     case compressionFailed
     case decompressionFailed
+    case protectedSystemFont
 
     var errorDescription: String? {
         switch self {
@@ -38,6 +39,7 @@ enum FontConversionError: LocalizedError {
         case .unsupportedFormat(let what): return "\(what) isn't supported yet."
         case .compressionFailed: return "Compression failed."
         case .decompressionFailed: return "This web font's data couldn't be decompressed."
+        case .protectedSystemFont: return "Apple's system fonts are licensed for use on this Mac only, so they can't be exported or converted."
         }
     }
 }

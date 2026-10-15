@@ -21,6 +21,20 @@ struct MCPSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            #if APPSTORE
+            LabeledContent("Delivery Folder") {
+                HStack {
+                    Text(mcp.deliveryFolder.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "None")
+                        .foregroundStyle(.secondary)
+                        .help(mcp.deliveryFolder ?? "")
+                    Button("Choose…") { mcp.chooseDeliveryFolder() }
+                }
+            }
+            Text("Where connected tools can save fonts directly on this Mac. Tools can always receive fonts without it.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            #endif
+
             LabeledContent("Port") {
                 TextField("Port", value: Binding(
                     get: { mcp.port },

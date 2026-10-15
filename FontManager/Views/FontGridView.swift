@@ -26,6 +26,7 @@ struct FontGridView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            GetStartedBanner()
             if fontService.filteredFonts.isEmpty {
                 emptyState
             } else {

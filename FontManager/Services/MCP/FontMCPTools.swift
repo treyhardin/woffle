@@ -169,6 +169,12 @@ enum FontMCPTools {
         }
         let format = args["format"]?.stringValue?.lowercased() ?? "woff2"
         let destination = args["destination"]?.stringValue
+        #if APPSTORE
+        // The sandbox only allows writing into folders the user granted.
+        if let destination, !isWritableInSandbox(destination) {
+            return errorResult("`destination` must be inside the Delivery Folder set in Font Manager (Settings → MCP Server) or one of its source folders. Omit `destination` to receive the font bytes instead.")
+        }
+        #endif
         let includeCSS = args["includeCSS"]?.boolValue ?? true
         let pathPrefix = args["cssPathPrefix"]?.stringValue ?? "./"
         let display = args["cssFontDisplay"]?.stringValue ?? "swap"
@@ -247,6 +253,23 @@ enum FontMCPTools {
     }
 
     // MARK: - Helpers
+
+    static let deliveryFolderKey = "mcp.deliveryFolder"
+
+    #if APPSTORE
+    /// Whether `path` falls inside a folder the user granted: the MCP Delivery Folder or a
+    /// source folder (the app holds security-scoped access to both).
+    private static func isWritableInSandbox(_ path: String) -> Bool {
+        let defaults = UserDefaults.standard
+        let roots = (defaults.stringArray(forKey: "customFontDirectories") ?? [])
+            + [defaults.string(forKey: deliveryFolderKey)].compactMap { $0 }
+        let target = URL(fileURLWithPath: (path as NSString).expandingTildeInPath).standardizedFileURL.path
+        return roots.contains { root in
+            let root = URL(fileURLWithPath: root).standardizedFileURL.path
+            return target == root || target.hasPrefix(root + "/")
+        }
+    }
+    #endif
 
     /// Writes `data` to `destination`. If `destination` is (or looks like) a directory,
     /// the file is written inside it using `filename`; otherwise `destination` is treated

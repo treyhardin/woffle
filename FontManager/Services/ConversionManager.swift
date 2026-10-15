@@ -21,6 +21,10 @@ final class ConversionManager: ObservableObject {
     // MARK: - Export (outbound "Download as…")
 
     func download(_ member: FontMember, as format: ExportFormat) {
+        guard member.isExportable else {
+            toast.flash(FontConversionError.protectedSystemFont.localizedDescription, isError: true)
+            return
+        }
         guard ensureLicenseAck({ [weak self] in self?.download(member, as: format) }) else { return }
 
         let panel = NSSavePanel()
@@ -46,6 +50,11 @@ final class ConversionManager: ObservableObject {
     }
 
     func downloadAll(_ members: [FontMember], family: String, as format: ExportFormat) {
+        let members = members.filter(\.isExportable)
+        guard !members.isEmpty else {
+            toast.flash(FontConversionError.protectedSystemFont.localizedDescription, isError: true)
+            return
+        }
         guard ensureLicenseAck({ [weak self] in self?.downloadAll(members, family: family, as: format) }) else { return }
 
         guard let directory = chooseDirectory(message: "Choose a folder to export “\(family)” styles into") else { return }
@@ -65,12 +74,17 @@ final class ConversionManager: ObservableObject {
 
     /// Export every style of multiple families into one folder (a subfolder per family).
     func downloadMany(_ fonts: [FontItem], as format: ExportFormat) {
-        guard !fonts.isEmpty else { return }
+        // Apple's system fonts are skipped (not exportable); the rest export as usual.
+        let fonts = fonts.filter { !$0.exportableMembers.isEmpty }
+        guard !fonts.isEmpty else {
+            toast.flash(FontConversionError.protectedSystemFont.localizedDescription, isError: true)
+            return
+        }
         guard ensureLicenseAck({ [weak self] in self?.downloadMany(fonts, as: format) }) else { return }
 
         guard let root = chooseDirectory(message: "Choose a folder to export \(fonts.count) font families into") else { return }
 
-        let total = fonts.reduce(0) { $0 + $1.members.count }
+        let total = fonts.reduce(0) { $0 + $1.exportableMembers.count }
         let token = toast.begin("Exporting \(total) styles…")
         Task {
             var saved = 0
@@ -81,7 +95,7 @@ final class ConversionManager: ObservableObject {
                 let familyDirectory = root.appendingPathComponent(folderName, isDirectory: true)
                 try? FileManager.default.createDirectory(at: familyDirectory, withIntermediateDirectories: true)
                 var used = Set<String>()
-                for member in font.members {
+                for member in font.exportableMembers {
                     index += 1
                     toast.update(token, message: "Exporting \(index) of \(total)…")
                     if await export(member, as: format, into: familyDirectory, used: &used) { saved += 1 } else { failed += 1 }

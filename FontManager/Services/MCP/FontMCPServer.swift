@@ -209,13 +209,13 @@ actor FontMCPServer {
         ),
         Tool(
             name: "get_font",
-            description: "Delivers one or more specific faces, converted for use. Default format is woff2. By default returns the font bytes (base64 in structuredContent) so the calling agent can write them into its own project; pass `destination` to instead write files to a path reachable from this Mac. Includes a ready-to-use @font-face rule per face.",
+            description: "Delivers one or more specific faces, converted for use. Default format is woff2. By default returns the font bytes (base64 in structuredContent) so the calling agent can write them into its own project; pass `destination` to instead write files to a path reachable from this Mac. Includes a ready-to-use @font-face rule per face. Apple system fonts (faces with exportable=false) are licensed for this Mac only and are refused.",
             inputSchema: [
                 "type": "object",
                 "properties": [
                     "faces": ["type": "array", "items": ["type": "string"], "description": "PostScript names of the faces to deliver (from find_fonts)."],
                     "format": ["type": "string", "enum": ["woff2", "woff", "otf", "ttf"], "description": "Output format. Default woff2. otf/ttf deliver the native outlines as-is (no OTF↔TTF outline conversion)."],
-                    "destination": ["type": "string", "description": "Optional path reachable from this Mac (a directory, or a full file path for a single face). If set, files are written there and the path is returned instead of bytes."],
+                    "destination": ["type": "string", "description": "Optional path reachable from this Mac (a directory, or a full file path for a single face). If set, files are written there and the path is returned instead of bytes. (App Store version: must be inside the Delivery Folder set in the app's MCP settings, or a source folder.)"],
                     "includeCSS": ["type": "boolean", "description": "Include an @font-face rule per face. Default true."],
                     "cssPathPrefix": ["type": "string", "description": "URL prefix for the @font-face src (default './')."],
                     "cssFontDisplay": ["type": "string", "description": "font-display value for the @font-face rule (default 'swap')."],

@@ -44,6 +44,7 @@ enum FontConversionService {
 
     /// Export a member to a given format, returning the bytes and the file extension.
     static func export(_ member: FontMember, as format: ExportFormat) throws -> (data: Data, ext: String) {
+        guard member.isExportable else { throw FontConversionError.protectedSystemFont }
         let sfnt = try sourceSFNT(for: member)
         switch format {
         case .native:
@@ -57,6 +58,7 @@ enum FontConversionService {
 
     /// Decode any web/desktop font file into an installable SFNT, including WOFF2.
     static func webFontToSFNT(_ url: URL) throws -> (data: Data, isTrueType: Bool) {
+        guard !FontMember.isAppleSupplied(url) else { throw FontConversionError.protectedSystemFont }
         let data = try Data(contentsOf: url)
         if data.count >= 4, Array(data.prefix(4)) == Array("wOF2".utf8) {
             let sfnt = try WOFF2.decode(data)

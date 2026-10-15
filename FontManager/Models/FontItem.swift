@@ -100,3 +100,26 @@ struct FontMember: Identifiable, Hashable, Sendable {
         self.fileURL = fileURL
     }
 }
+
+extension FontMember {
+    /// Apple's bundled fonts live under /System (including downloadable system fonts). Their
+    /// license covers use on this Mac only, so the app never exports or converts them.
+    static func isAppleSupplied(_ url: URL) -> Bool {
+        url.standardizedFileURL.path.hasPrefix("/System/")
+    }
+
+    /// Whether this face may be exported/converted: it has a backing file that isn't
+    /// Apple-supplied. (File-less faces are system-provided too.)
+    var isExportable: Bool {
+        guard let fileURL else { return false }
+        return !Self.isAppleSupplied(fileURL)
+    }
+}
+
+extension FontItem {
+    /// Only fonts this app registers — from source folders or imports — can be activated
+    /// and deactivated. Fonts in the macOS font folders are managed by macOS (Font Book).
+    var canToggleActivation: Bool { source != .system }
+
+    var exportableMembers: [FontMember] { members.filter(\.isExportable) }
+}

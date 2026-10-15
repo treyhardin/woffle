@@ -1,3 +1,7 @@
+// Sparkle auto-updates — open-source (direct download) build only. The App Store build
+// updates through the App Store and compiles this file out (APPSTORE flag).
+#if !APPSTORE
+
 import SwiftUI
 import Combine
 // Sparkle 2.6 predates Swift 6 concurrency annotations; @preconcurrency lets us pass
@@ -114,9 +118,9 @@ struct CheckForUpdatesView: View {
     }
 }
 
-/// Settings window (⌘,).
-struct SettingsView: View {
-    private let updater: SPUUpdater
+/// The "Updates" section of Settings.
+struct UpdateSettingsSection: View {
+    let updater: SPUUpdater
     @State private var automaticallyChecks: Bool
 
     init(updater: SPUUpdater) {
@@ -125,25 +129,22 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        Form {
-            Section("Updates") {
-                Toggle("Automatically check for updates", isOn: $automaticallyChecks)
-                    .onChange(of: automaticallyChecks) { _, newValue in
-                        updater.automaticallyChecksForUpdates = newValue
-                    }
-                HStack {
-                    Button("Check Now…") { updater.checkForUpdates() }
-                    Spacer()
-                    if let date = updater.lastUpdateCheckDate {
-                        Text("Last checked \(date.formatted(date: .abbreviated, time: .shortened))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+        Section("Updates") {
+            Toggle("Automatically check for updates", isOn: $automaticallyChecks)
+                .onChange(of: automaticallyChecks) { _, newValue in
+                    updater.automaticallyChecksForUpdates = newValue
+                }
+            HStack {
+                Button("Check Now…") { updater.checkForUpdates() }
+                Spacer()
+                if let date = updater.lastUpdateCheckDate {
+                    Text("Last checked \(date.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-            MCPSettingsView()
         }
-        .formStyle(.grouped)
-        .frame(width: 420)
     }
 }
+
+#endif

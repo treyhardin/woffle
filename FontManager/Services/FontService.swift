@@ -41,6 +41,10 @@ class FontService: ObservableObject {
     /// Paths of individually-converted fonts the app activates on launch.
     private var importedPaths: [String] = []
 
+    /// Persistent access to source folders and imported font files (required in the sandbox).
+    private let directoryAccess = BookmarkStore(defaultsKey: "customFontDirectoryBookmarks")
+    private let importedAccess = BookmarkStore(defaultsKey: "importedFontBookmarks")
+
     /// System fonts rarely change, so cache them and only rebuild custom/imported on edits.
     private var cachedSystemItems: [FontItem]?
 
@@ -265,6 +269,8 @@ class FontService: ObservableObject {
         self.toast = toast
         customDirectories = UserDefaults.standard.stringArray(forKey: directoriesKey) ?? []
         importedPaths = UserDefaults.standard.stringArray(forKey: importedKey) ?? []
+        directoryAccess.startAccessing(customDirectories)
+        importedAccess.startAccessing(importedPaths)
         if let raw = UserDefaults.standard.string(forKey: sortOrderKey), let saved = SortOrder(rawValue: raw) {
             sortOrder = saved
         }
@@ -346,6 +352,11 @@ class FontService: ObservableObject {
     }
 
     func setActive(_ active: Bool, for items: [FontItem]) {
+        let items = items.filter(\.canToggleActivation)
+        guard !items.isEmpty else {
+            toast.flash("Fonts in the macOS font folders are managed by macOS.", isError: true)
+            return
+        }
         var ok = 0
         var failed = 0
         for font in items {
@@ -441,13 +452,20 @@ class FontService: ObservableObject {
             let system = cachedSystem ?? FontService.buildSystemItems(raw ?? [])
             let custom = FontService.buildCustomItems(dirs)
             let importedResult = FontService.buildImportedItems(imported)
-            let all = (system + custom + importedResult.items)
+            // Fonts this app activated also show up in macOS's own font list; drop those
+            // system entries so each family appears once, under the source that owns it.
+            let ownedFiles = Set((custom + importedResult.items).flatMap { $0.members.compactMap { $0.fileURL?.standardizedFileURL.path } })
+            let systemOnly = system.filter { item in
+                !item.members.allSatisfy { $0.fileURL.map { ownedFiles.contains($0.standardizedFileURL.path) } ?? false }
+            }
+            let all = (systemOnly + custom + importedResult.items)
                 .sorted { $0.familyName.localizedCaseInsensitiveCompare($1.familyName) == .orderedAscending }
 
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.cachedSystemItems = system
                 if importedResult.livePaths.count != imported.count {
+                    for path in Set(imported).subtracting(importedResult.livePaths) { self.importedAccess.remove(path) }
                     self.importedPaths = importedResult.livePaths
                     UserDefaults.standard.set(importedResult.livePaths, forKey: self.importedKey)
                 }
@@ -584,6 +602,10 @@ class FontService: ObservableObject {
     }
 
     nonisolated private static func buildCustomItems(_ directories: [String]) -> [FontItem] {
+        // Fonts this app registered persist across launches (persistent/user scope), so read
+        // the live state from CoreText rather than assuming everything starts inactive.
+        let registered = Set((CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []).map { $0.standardizedFileURL.path })
+
         // Keyed by (directory, family) so the same family in two folders stays distinct.
         var groups: [String: (family: String, members: [FontMember], directory: String, descriptor: CTFontDescriptor)] = [:]
 
@@ -632,7 +654,7 @@ class FontService: ObservableObject {
             FontItem(
                 familyName: value.family,
                 members: value.members,
-                isActive: false,
+                isActive: value.members.contains { $0.fileURL.map { registered.contains($0.standardizedFileURL.path) } ?? false },
                 source: .custom(directory: value.directory),
                 classification: FontClassifier.classify(descriptor: value.descriptor, name: value.family),
                 width: FontClassifier.width(descriptor: value.descriptor, name: value.family),
@@ -704,6 +726,7 @@ class FontService: ObservableObject {
         guard !urls.isEmpty else { return }
         for url in urls where !importedPaths.contains(url.path) {
             importedPaths.append(url.path)
+            importedAccess.add(url)
         }
         UserDefaults.standard.set(importedPaths, forKey: importedKey)
         reloadUserFonts()
@@ -716,6 +739,7 @@ class FontService: ObservableObject {
             var error: Unmanaged<CFError>?
             CTFontManagerUnregisterFontsForURL(url as CFURL, .user, &error)
             importedPaths.removeAll { $0 == url.path }
+            importedAccess.remove(url.path)
         }
         UserDefaults.standard.set(importedPaths, forKey: importedKey)
         reloadUserFonts()
@@ -736,6 +760,7 @@ class FontService: ObservableObject {
         guard !customDirectories.contains(path) else { return }
 
         customDirectories.append(path)
+        directoryAccess.add(url)
         saveDirectories()
         directoryWatcher?.watch(customDirectories)
         reloadUserFonts()
@@ -750,6 +775,7 @@ class FontService: ObservableObject {
         }
 
         customDirectories.removeAll { $0 == path }
+        directoryAccess.remove(path)
         saveDirectories()
         directoryWatcher?.watch(customDirectories)
         reloadUserFonts()
@@ -770,6 +796,10 @@ class FontService: ObservableObject {
     @discardableResult
     func deactivateFont(_ font: FontItem, notify: Bool = true) -> Bool {
         guard let index = fonts.firstIndex(where: { $0.id == font.id }) else { return false }
+        guard font.canToggleActivation else {
+            if notify { toast.flash("“\(font.familyName)” is managed by macOS — use Font Book to disable it.", isError: true) }
+            return false
+        }
         let urls = fileURLs(for: font)
         guard !urls.isEmpty else {
             if notify { toast.flash("“\(font.familyName)” can't be deactivated (no font file).", isError: true) }
@@ -779,23 +809,27 @@ class FontService: ObservableObject {
         var failed = false
         for url in urls {
             var error: Unmanaged<CFError>?
-            if !CTFontManagerUnregisterFontsForURL(url as CFURL, .user, &error) { failed = true }
-        }
-        // System fonts can't truly be unregistered; treat as success for the toggle's sake.
-        fonts[index].isActive = false
-        if notify {
-            if failed {
-                toast.flash("“\(font.familyName)” couldn't be fully deactivated.", isError: true)
-            } else {
-                toast.flash("Deactivated “\(font.familyName)”")
+            // Not-registered means it's already off; that's not a real failure.
+            if !CTFontManagerUnregisterFontsForURL(url as CFURL, .user, &error) {
+                if let code = error?.takeRetainedValue(), CFErrorGetCode(code) != 201 /* not registered */ {
+                    failed = true
+                }
             }
         }
-        return !failed
+        if failed {
+            // Some files stayed registered — report the real state rather than flipping the toggle.
+            if notify { toast.flash("“\(font.familyName)” couldn't be fully deactivated.", isError: true) }
+            return false
+        }
+        fonts[index].isActive = false
+        if notify { toast.flash("Deactivated “\(font.familyName)”") }
+        return true
     }
 
     @discardableResult
     func activateFont(_ font: FontItem, notify: Bool = true) -> Bool {
         guard let index = fonts.firstIndex(where: { $0.id == font.id }) else { return false }
+        guard font.canToggleActivation else { return true }   // macOS-managed fonts are always active
         let urls = fileURLs(for: font)
         guard !urls.isEmpty else {
             if notify { toast.flash("“\(font.familyName)” can't be activated (no font file).", isError: true) }

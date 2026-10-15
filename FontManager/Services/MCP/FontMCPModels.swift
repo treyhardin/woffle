@@ -34,8 +34,10 @@ struct FontFace: Sendable, Codable {
     /// CSS numeric weight (100–900), derived from the style name.
     let weight: Int
     /// The face's on-disk container (`otf`/`ttf`/`woff`/`woff2`/`ttc`) or `system` when
-    /// there's no backing file. Any face can still be delivered as woff2/woff/otf/ttf.
+    /// there's no backing file. Exportable faces can be delivered as woff2/woff/otf/ttf.
     let sourceFormat: String
+    /// False for Apple's bundled system fonts, which `get_font` won't deliver (licensing).
+    let exportable: Bool
 }
 
 /// A family record: display metadata (override-aware) plus the underlying members needed
@@ -72,7 +74,8 @@ enum FontCatalog {
                         postScriptName: member.postScriptName,
                         style: member.styleName,
                         weight: CSSWeight.fromStyle(member.styleName),
-                        sourceFormat: sourceFormat(member)
+                        sourceFormat: sourceFormat(member),
+                        exportable: member.isExportable
                     )
                 },
                 members: item.members

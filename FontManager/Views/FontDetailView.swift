@@ -1,4 +1,5 @@
 import SwiftUI
+import TipKit
 import CoreText
 import AppKit
 
@@ -16,6 +17,7 @@ struct FontDetailView: View {
     @State private var metadata: String?
     // Details are view-only until Edit is tapped, which swaps in Style/Width/Foundry controls.
     @State private var isEditing = false
+    private let editTip = EditDetailsTip()
     // Draft foundry text bound to the combo box while editing; committed as an override.
     @State private var foundryDraft = ""
 
@@ -71,6 +73,9 @@ struct FontDetailView: View {
             let summary = await Task.detached { FontDetailView.metadata(for: font) }.value
             metadata = summary
         }
+        .task(id: font.id) {
+            await AppTips.fontOpened.donate()
+        }
         .onChange(of: font.id) { _, _ in
             isEditing = false   // don't carry edit mode across fonts
         }
@@ -114,17 +119,24 @@ struct FontDetailView: View {
                     .menuStyle(.button)
                     .buttonStyle(.plain)
                     .menuIndicator(.hidden)
-                    .help("Download all styles…")
+                    .disabled(font.exportableMembers.isEmpty)
+                    .help(font.exportableMembers.isEmpty ? Self.systemExportNote : "Download all styles…")
                 }
 
                 Button(isEditing ? "Done" : "Edit") {
                     isEditing.toggle()
                 }
                 .buttonStyle(.bordered)
+                .popoverTip(editTip)
 
                 // Activate is the affirmative action (prominent accent); deactivating is
                 // reversible and harmless, so it's a plain button, not a red one.
-                if font.isActive {
+                if !font.canToggleActivation {
+                    Text("Managed by macOS")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help("Installed in a macOS font folder — use Font Book to disable it.")
+                } else if font.isActive {
                     Button("Deactivate") { fontService.toggleFont(font) }
                         .buttonStyle(.bordered)
                 } else {
@@ -137,6 +149,8 @@ struct FontDetailView: View {
 
     /// Large specimen of the family name (or the typed preview text) set in its own
     /// typeface — the visual anchor for the pane.
+    static let systemExportNote = "Apple system fonts can't be exported — they're licensed for use on this Mac only."
+
     private var heroSpecimen: some View {
         Text(previewText.isEmpty ? font.familyName : previewText)
             .font(font.members.first.map { FontPreview.font(for: $0, size: 56, isActive: font.isActive) } ?? .system(size: 56))
@@ -210,7 +224,8 @@ struct FontDetailView: View {
                 .menuStyle(.button)
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
-                .help("Download this style…")
+                .disabled(!member.isExportable)
+                .help(member.isExportable ? "Download this style…" : Self.systemExportNote)
             }
 
             Text(previewText.isEmpty ? font.familyName : previewText)
@@ -483,11 +498,16 @@ struct MultiFontDetailView: View {
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
+                    .disabled(!fonts.contains { !$0.exportableMembers.isEmpty })
 
-                    Button("Activate") { fontService.setActive(true, for: fonts) }
-                        .buttonStyle(.borderedProminent)
-                    Button("Deactivate") { fontService.setActive(false, for: fonts) }
-                        .buttonStyle(.bordered)
+                    // Only fonts this app registers can be toggled; hide the controls when
+                    // every selected font is managed by macOS.
+                    if fonts.contains(where: \.canToggleActivation) {
+                        Button("Activate") { fontService.setActive(true, for: fonts) }
+                            .buttonStyle(.borderedProminent)
+                        Button("Deactivate") { fontService.setActive(false, for: fonts) }
+                            .buttonStyle(.bordered)
+                    }
                 }
 
                 Divider()

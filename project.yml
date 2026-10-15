@@ -42,11 +42,18 @@ targets:
         GCC_WARN_INHIBIT_ALL_WARNINGS: YES
         CLANG_WARN_DOCUMENTATION_COMMENTS: NO
 
+  # Two app targets share all sources. Differences live in compile flags, entitlements
+  # and Info.plist keys — keep anything build-specific behind `#if APPSTORE`.
+
+  # Open-source build: GitHub download, Sparkle auto-updates, not sandboxed.
   FontManager:
     type: application
     platform: macOS
     sources:
-      - FontManager
+      - path: FontManager
+        excludes:
+          - Info-AppStore.plist
+          - "*.entitlements"
     dependencies:
       - target: WOFF2Kit
       - package: Sparkle
@@ -59,12 +66,13 @@ targets:
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         LSApplicationCategoryType: "public.app-category.utilities"
         NSHumanReadableCopyright: "© 2026 Trey Hardin · MIT Licensed"
+        ITSAppUsesNonExemptEncryption: false
         # Sparkle auto-update
         SUFeedURL: "https://github.com/treyhardin/font-manager/releases/latest/download/appcast.xml"
         SUPublicEDKey: "m/iJK41QKnw6jETwwNI/u7nedlGifF6y8VaDi9e2LpY="
         SUEnableAutomaticChecks: true
     settings:
-      base:
+      base: &appSettings
         PRODUCT_BUNDLE_IDENTIFIER: co.trumancreative.FontManager
         PRODUCT_NAME: Font Manager
         MARKETING_VERSION: "1.4.0"
@@ -81,3 +89,44 @@ targets:
       path: FontManager/FontManager.entitlements
       properties:
         com.apple.security.app-sandbox: false
+
+  # Mac App Store build: sandboxed, no Sparkle (the App Store delivers updates).
+  FontManagerAppStore:
+    type: application
+    platform: macOS
+    sources:
+      - path: FontManager
+        excludes:
+          - Info.plist
+          - "*.entitlements"
+          - Views/UpdaterViews.swift
+    dependencies:
+      - target: WOFF2Kit
+      - package: MCP
+    info:
+      path: FontManager/Info-AppStore.plist
+      properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        LSApplicationCategoryType: "public.app-category.utilities"
+        NSHumanReadableCopyright: "© 2026 Trey Hardin · MIT Licensed"
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        <<: *appSettings
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APPSTORE"
+      configs:
+        # Distinct name for local runs so it doesn't overwrite the open-source Debug app
+        # (and is easy to tell apart). Release/archive keeps the real name.
+        Debug:
+          PRODUCT_NAME: Font Manager (App Store)
+    entitlements:
+      path: FontManager/FontManager-AppStore.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        # Source folders and save locations the user picks, kept across launches.
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.bookmarks.app-scope: true
+        # The optional MCP server (localhost + Tailscale only).
+        com.apple.security.network.server: true
