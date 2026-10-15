@@ -42,8 +42,10 @@ check finds one (toggle in **Settings → Updates**).
 - **Filter by width** — condensed, regular, or expanded.
 - **Filter by foundry** — read from each font's metadata (with near-complete coverage
   via a vendor-ID fallback) and grouped so a foundry's variant names collapse together.
-- **Sort** the list by name (A–Z or Z–A), date added (most recent or oldest), or
-  number of styles. Your choice persists across launches.
+- **Sort** the main browse view by name (A–Z or Z–A) or most recently added. Your choice
+  persists across launches. The sidebar stays A–Z, with an **A–Z bar** beside the scroll
+  bar while you scroll — click or drag it to jump to a letter.
+- **Show in Finder** — right-click any family in the sidebar to reveal its font files.
 - **Card grid** — browse all fonts as specimen cards with your own live preview text;
   click any card for full detail.
 - **Auto-sync** — source folders are watched, so fonts you drop in appear automatically,

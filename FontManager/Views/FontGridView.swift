@@ -29,9 +29,17 @@ struct FontGridView: View {
             if fontService.filteredFonts.isEmpty {
                 emptyState
             } else {
-                switch layout {
-                case .grid: gridContent
-                case .list: listContent
+                ScrollViewReader { proxy in
+                    Group {
+                        switch layout {
+                        case .grid: gridContent
+                        case .list: listContent
+                        }
+                    }
+                    // Letters only group under the name sorts.
+                    .alphabetScrubber(fonts: fontService.sortOrder == .mostRecent ? [] : fontService.browseFonts,
+                                      proxy: proxy,
+                                      descending: fontService.sortOrder == .nameDescending)
                 }
             }
         }
@@ -40,7 +48,7 @@ struct FontGridView: View {
     private var gridContent: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(fontService.filteredFonts) { font in
+                ForEach(fontService.browseFonts) { font in
                     FontCardView(font: font, previewText: previewText)
                 }
             }
@@ -51,7 +59,7 @@ struct FontGridView: View {
     private var listContent: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(fontService.filteredFonts) { font in
+                ForEach(fontService.browseFonts) { font in
                     FontRowLargeView(font: font, previewText: previewText)
                     Divider()
                 }
@@ -63,6 +71,7 @@ struct FontGridView: View {
     private var header: some View {
         HStack(spacing: 10) {
             previewInput
+            SortMenu(selection: $fontService.sortOrder)
             LayoutToggle(layout: $layoutRaw)
         }
         .padding(.horizontal, 16)
@@ -104,6 +113,43 @@ struct FontGridView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// A compact dropdown for the browse pane's order, styled to sit beside the layout toggle.
+struct SortMenu: View {
+    @Binding var selection: FontService.SortOrder
+
+    var body: some View {
+        Menu {
+            ForEach(FontService.SortOrder.allCases) { option in
+                Button {
+                    selection = option
+                } label: {
+                    if option == selection {
+                        Label(option.rawValue, systemImage: "checkmark")
+                    } else {
+                        Text(option.rawValue)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(selection.rawValue)
+                    .foregroundStyle(.primary)
+                PhIcon(.caretUpDown, size: 13)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Sort fonts")
     }
 }
 

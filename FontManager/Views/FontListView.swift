@@ -4,25 +4,20 @@ struct FontListView: View {
     @EnvironmentObject var fontService: FontService
     @FocusState private var searchFocused: Bool
     @ScaledMetric(relativeTo: .body) private var styleGlyphSize: CGFloat = 15
-
     var body: some View {
         VStack(spacing: 0) {
             // Compact filter header
             VStack(spacing: 6) {
                 SidebarSearchField(text: $fontService.searchText, focused: $searchFocused)
 
-                // Filter and sort inputs stack full-width, each showing its selected value
+                // Filter inputs stack full-width, each showing its selected value
                 // ("Foundry     All"), so the current state is always visible at a glance.
-                FilterMenuPicker(title: "Source", selection: $fontService.filterSource) { source in
-                    fontService.count(for: source)
-                }
                 FilterMenuPicker(title: "Status", selection: $fontService.filterStatus) { status in
                     fontService.count(for: status)
                 }
                 if fontService.availableFoundries.count > 1 {
                     FoundryFilterMenu()
                 }
-                FilterMenuPicker(title: "Sort", selection: $fontService.sortOrder)
 
                 // Style/Width are unresolved when filtering to "Missing Info", so hide them there.
                 if fontService.filterStatus != .missingInfo {
@@ -77,20 +72,17 @@ struct FontListView: View {
             if fontService.filteredFonts.isEmpty {
                 emptyState
             } else {
-                List(fontService.filteredFonts, selection: $fontService.selection) { font in
-                    FontRowView(font: font)
+                ScrollViewReader { proxy in
+                    List(fontService.filteredFonts, selection: $fontService.selection) { font in
+                        FontRowView(font: font)
+                    }
+                    .listStyle(.sidebar)
+                    .alphabetScrubber(fonts: fontService.filteredFonts, proxy: proxy)
                 }
-                .listStyle(.sidebar)
             }
 
             Divider()
             footer
-        }
-        .onChange(of: fontService.filterSource) { _, _ in
-            // Sub-filters don't carry across source changes (avoids stale empty lists).
-            fontService.filterClassification = nil
-            fontService.filterWidth = nil
-            fontService.filterFoundry = nil
         }
         .onChange(of: fontService.searchFocusToken) { _, _ in
             searchFocused = true
@@ -202,7 +194,7 @@ struct FilterFieldMenuStyle: ButtonStyle {
 }
 
 /// A self-describing, full-width sidebar dropdown that shows its selected value
-/// ("Source     All"). Used for Source, Status, and Sort.
+/// ("Status     All"). Used for Status in the sidebar.
 struct FilterMenuPicker<T>: View where T: CaseIterable & Hashable & RawRepresentable, T.RawValue == String {
     let title: String
     @Binding var selection: T
@@ -459,6 +451,12 @@ struct FontRowView: View {
             Button(font.isActive ? "Deactivate" : "Activate") {
                 fontService.toggleFont(font)
             }
+            // Selects every file backing the family (deduped — styles can share one .ttc).
+            let fileURLs = Array(Set(font.members.compactMap(\.fileURL)))
+            Button("Show in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting(fileURLs)
+            }
+            .disabled(fileURLs.isEmpty)
             if case .imported = font.source {
                 Divider()
                 Button("Remove from Library", role: .destructive) {

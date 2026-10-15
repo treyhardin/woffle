@@ -7,13 +7,13 @@ class FontService: ObservableObject {
     @Published var fonts: [FontItem] = []
     @Published var searchText: String = ""
     @Published var customDirectories: [String] = []
-    @Published var filterSource: FontSourceFilter = .all
     @Published var filterStatus: StatusFilter = .all
     @Published var filterClassification: FontClassification?
     @Published var filterWidth: FontWidth?
     /// Selected foundry to filter by; `nil` means "All". Matches `displayFoundry`.
     @Published var filterFoundry: String?
-    /// How the sidebar list is ordered. Persisted across launches.
+    /// How the main browse pane (grid/list) is ordered; the sidebar is always A–Z.
+    /// Persisted across launches.
     @Published var sortOrder: SortOrder = .nameAscending {
         didSet { UserDefaults.standard.set(sortOrder.rawValue, forKey: sortOrderKey) }
     }
@@ -55,12 +55,6 @@ class FontService: ObservableObject {
         let members: [RawMember]
     }
 
-    enum FontSourceFilter: String, CaseIterable {
-        case all = "All"
-        case system = "System"
-        case custom = "Custom"
-    }
-
     enum StatusFilter: String, CaseIterable {
         case all = "All"
         case active = "Active"
@@ -72,8 +66,6 @@ class FontService: ObservableObject {
         case nameAscending = "Name (A–Z)"
         case nameDescending = "Name (Z–A)"
         case mostRecent = "Most Recent"
-        case oldest = "Oldest"
-        case mostStyles = "Most Styles"
 
         var id: String { rawValue }
 
@@ -87,18 +79,15 @@ class FontService: ObservableObject {
             switch self {
             case .nameAscending: return byName()
             case .nameDescending: return byName(ascending: false)
-            case .mostRecent, .oldest:
+            case .mostRecent:
                 switch (a.dateAdded, b.dateAdded) {
                 case let (x?, y?):
                     if x == y { return byName() }
-                    return self == .mostRecent ? x > y : x < y
+                    return x > y
                 case (_?, nil): return true   // dated fonts sort ahead of undated ones
                 case (nil, _?): return false
                 case (nil, nil): return byName()
                 }
-            case .mostStyles:
-                if a.members.count == b.members.count { return byName() }
-                return a.members.count > b.members.count
             }
         }
     }
@@ -157,33 +146,9 @@ class FontService: ObservableObject {
         effectiveClassification(font) == .unclassified
     }
 
-    private func fontsForCurrentSource() -> [FontItem] {
-        switch filterSource {
-        case .all:
-            return fonts
-        case .system:
-            return fonts.filter { $0.source == .system }
-        case .custom:
-            // "Custom" groups everything the user added: directory fonts and imports.
-            return fonts.filter {
-                if case .system = $0.source { return false }
-                return true
-            }
-        }
-    }
-
     /// Number of fonts still missing a Style (drives the "Missing Info" count).
     var missingCount: Int {
         fonts.filter(isMissingInfo).count
-    }
-
-    /// Total families for a source bucket, independent of other filters (for the dropdown count).
-    func count(for source: FontSourceFilter) -> Int {
-        switch source {
-        case .all: return fonts.count
-        case .system: return fonts.filter { $0.source == .system }.count
-        case .custom: return fonts.filter { if case .system = $0.source { return false }; return true }.count
-        }
     }
 
     /// Total families for a status bucket, independent of other filters (for the dropdown count).
@@ -206,13 +171,12 @@ class FontService: ObservableObject {
 
     /// True when any filter (beyond the default "All" everything) is active.
     var hasActiveFilters: Bool {
-        filterSource != .all || filterStatus != .all
+        filterStatus != .all
             || filterClassification != nil || filterWidth != nil
             || filterFoundry != nil || !searchText.isEmpty
     }
 
     func clearFilters() {
-        filterSource = .all
         filterStatus = .all
         filterClassification = nil
         filterWidth = nil
@@ -220,25 +184,25 @@ class FontService: ObservableObject {
         searchText = ""
     }
 
-    /// Classifications present in the current source filter (effective values), in enum
+    /// Classifications present in the library (effective values), in enum
     /// order — drives the filter controls so they never offer an empty bucket.
     var availableClassifications: [FontClassification] {
-        let present = Set(fontsForCurrentSource().map(effectiveClassification))
+        let present = Set(fonts.map(effectiveClassification))
         // "Unclassified" isn't a meaningful bucket to filter by — omit it from the controls.
         return FontClassification.allCases.filter { $0 != .unclassified && present.contains($0) }
     }
 
-    /// Widths present in the current source filter, in enum order.
+    /// Widths present in the library, in enum order.
     var availableWidths: [FontWidth] {
-        let present = Set(fontsForCurrentSource().map(effectiveWidth))
+        let present = Set(fonts.map(effectiveWidth))
         return FontWidth.allCases.filter { present.contains($0) }
     }
 
-    /// Foundries present in the current source filter, by font count (most first), with
+    /// Foundries present in the library, by font count (most first), with
     /// "Unknown" always last. Ties break alphabetically for a stable order.
     var availableFoundries: [String] {
         var counts: [String: Int] = [:]
-        for font in fontsForCurrentSource() { counts[displayFoundry(font), default: 0] += 1 }
+        for font in fonts { counts[displayFoundry(font), default: 0] += 1 }
         let named = counts.keys.filter { $0 != Self.unknownFoundry }.sorted { a, b in
             counts[a]! != counts[b]! ? counts[a]! > counts[b]!
                 : a.localizedCaseInsensitiveCompare(b) == .orderedAscending
@@ -246,13 +210,14 @@ class FontService: ObservableObject {
         return counts[Self.unknownFoundry] != nil ? named + [Self.unknownFoundry] : named
     }
 
-    /// Families for a foundry within the current source filter (for the menu badge counts).
+    /// Families for a foundry (for the menu badge counts).
     func count(forFoundry name: String) -> Int {
-        fontsForCurrentSource().filter { displayFoundry($0) == name }.count
+        fonts.filter { displayFoundry($0) == name }.count
     }
 
+    /// Fonts matching the current search and filters, A–Z (the sidebar's order).
     var filteredFonts: [FontItem] {
-        var result = fontsForCurrentSource()
+        var result = fonts
 
         // Already-selected rows stay visible even after they stop matching, so editing a
         // font's Style in "Missing Info" mode doesn't make it vanish out from under you.
@@ -286,7 +251,12 @@ class FontService: ObservableObject {
             }
         }
 
-        return result.sorted(by: sortOrder.areInIncreasingOrder)
+        return result.sorted(by: SortOrder.nameAscending.areInIncreasingOrder)
+    }
+
+    /// `filteredFonts` in the browse pane's chosen order.
+    var browseFonts: [FontItem] {
+        sortOrder == .nameAscending ? filteredFonts : filteredFonts.sorted(by: sortOrder.areInIncreasingOrder)
     }
 
     private let toast: ToastCenter

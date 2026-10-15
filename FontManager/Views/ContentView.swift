@@ -8,6 +8,17 @@ struct ContentView: View {
     @EnvironmentObject var updaterModel: UpdaterViewModel
     @State private var isDropTargeted = false
     @State private var showingDirectories = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Opening a font: the detail rises in from slightly smaller while the grid recedes
+    /// slightly larger, like stepping in; going back reverses it. Fades only with Reduce Motion.
+    private var detailTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98))
+    }
+
+    private var browseTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 1.02))
+    }
 
     /// Resolve the selected ids back to current FontItems (ids are stable across reloads).
     private var selectedFonts: [FontItem] {
@@ -22,14 +33,23 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 264, ideal: 280, max: 360)
                 .toolbar(removing: .sidebarToggle)
         } detail: {
-            switch selectedFonts.count {
-            case 0:
-                FontGridView()
-            case 1:
-                FontDetailView(font: selectedFonts[0])
-            default:
-                MultiFontDetailView(fonts: selectedFonts)
+            ZStack {
+                switch selectedFonts.count {
+                case 0:
+                    FontGridView()
+                        .transition(browseTransition)
+                case 1:
+                    FontDetailView(font: selectedFonts[0])
+                        .transition(detailTransition)
+                default:
+                    MultiFontDetailView(fonts: selectedFonts)
+                        .transition(detailTransition)
+                }
             }
+            // Animate only moving between All Fonts and a detail view — switching fonts
+            // within the detail view (e.g. from the sidebar) stays instant.
+            .animation(reduceMotion ? .easeInOut(duration: 0.15) : .smooth(duration: 0.28),
+                       value: selectedFonts.isEmpty)
         }
         .frame(minWidth: 820, minHeight: 460)
         .toolbar {

@@ -45,6 +45,7 @@ FontManager/
 │   ├── FontDetailView.swift        # Detail pane: preview + Download menus
 │   ├── DirectoriesView.swift       # Browse fonts by source directory
 │   ├── ConversionToast.swift       # Progress/result toast
+│   ├── AlphabetScrubber.swift      # Sidebar A–Z jump bar + scroll-wheel observer
 │   └── PhIcon.swift                # Ph enum + PhIcon/PhLabel for vendored Phosphor icons
 └── Services/
     ├── FontService.swift           # Enumeration, activation, imported fonts, filtering
