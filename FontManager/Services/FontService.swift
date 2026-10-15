@@ -19,6 +19,17 @@ class FontService: ObservableObject {
     }
     /// Selected font ids (multi-selection), kept here so filtering can keep selected rows visible.
     @Published var selection: Set<String> = []
+    /// User-made collections, shown in the sidebar. Persisted in `collections.json`.
+    @Published var collections: [FontCollection] = []
+    /// The collection being browsed; `nil` means All Fonts. Switching clears the selection
+    /// so you land on the collection's grid.
+    @Published var activeCollectionID: UUID? {
+        didSet { if activeCollectionID != oldValue { selection = [] } }
+    }
+    /// Attribute changes proposed by AI tools, awaiting review. Persisted.
+    @Published var suggestions: [AttributeSuggestion] = []
+    /// Set to ask the UI for a collection name (new or rename).
+    @Published var collectionPrompt: CollectionPrompt?
     /// Incremented to request the search field take focus (Cmd+F).
     @Published var searchFocusToken = 0
     /// User Style/Width overrides, keyed by `FontItem.id`. Persisted on-device.
@@ -223,6 +234,11 @@ class FontService: ObservableObject {
     var filteredFonts: [FontItem] {
         var result = fonts
 
+        if let collection = activeCollection {
+            let families = Set(collection.families)
+            result = result.filter { families.contains($0.familyName) }
+        }
+
         // Already-selected rows stay visible even after they stop matching, so editing a
         // font's Style in "Missing Info" mode doesn't make it vanish out from under you.
         switch filterStatus {
@@ -263,7 +279,7 @@ class FontService: ObservableObject {
         sortOrder == .nameAscending ? filteredFonts : filteredFonts.sorted(by: sortOrder.areInIncreasingOrder)
     }
 
-    private let toast: ToastCenter
+    let toast: ToastCenter
 
     init(toast: ToastCenter) {
         self.toast = toast
@@ -275,6 +291,8 @@ class FontService: ObservableObject {
             sortOrder = saved
         }
         loadOverrides()
+        loadCollections()
+        loadSuggestions()
         loadAllFonts()
 
         // Auto-refresh when files are added/removed in a watched source folder.
@@ -387,10 +405,7 @@ class FontService: ObservableObject {
     }
 
     private var overridesURL: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Font Manager", isDirectory: true)
-        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        return base.appendingPathComponent("overrides.json")
+        AppEnvironment.supportDirectory.appendingPathComponent("overrides.json")
     }
 
     private func loadOverrides() {
@@ -776,6 +791,33 @@ class FontService: ObservableObject {
 
         customDirectories.removeAll { $0 == path }
         directoryAccess.remove(path)
+        saveDirectories()
+        directoryWatcher?.watch(customDirectories)
+        reloadUserFonts()
+    }
+
+    /// Whether the app can currently read a source folder. In the sandbox a folder needs a
+    /// user grant — e.g. after moving from the open-source build, or a stale bookmark.
+    func canRead(directory path: String) -> Bool {
+        FileManager.default.isReadableFile(atPath: path)
+    }
+
+    /// Asks the user to re-select a folder the app can't read, restoring access.
+    func grantAccess(to path: String) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: path)
+        panel.prompt = "Grant Access"
+        panel.message = "Select “\(URL(fileURLWithPath: path).lastPathComponent)” so Font Manager can read its fonts."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        directoryAccess.remove(path)
+        if url.path != path, let index = customDirectories.firstIndex(of: path) {
+            customDirectories[index] = url.path   // they picked a different (moved) folder
+        }
+        directoryAccess.add(url)
         saveDirectories()
         directoryWatcher?.watch(customDirectories)
         reloadUserFonts()

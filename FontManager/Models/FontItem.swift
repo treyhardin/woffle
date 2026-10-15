@@ -123,3 +123,32 @@ extension FontItem {
 
     var exportableMembers: [FontMember] { members.filter(\.isExportable) }
 }
+
+/// A user-made group of fonts. Members are family names (like overrides), so a collection
+/// survives re-scans and folder moves, and a family appears once however many sources
+/// provide it.
+struct FontCollection: Identifiable, Codable, Hashable {
+    let id: UUID
+    var name: String
+    var families: [String]
+
+    init(name: String, families: [String] = []) {
+        self.id = UUID()
+        self.name = name
+        self.families = families
+    }
+}
+
+/// A pending request for a collection name, answered by the name alert in ContentView.
+enum CollectionPrompt: Identifiable {
+    /// New collection, optionally seeded with these families.
+    case create(families: [String])
+    case rename(FontCollection)
+
+    var id: String {
+        switch self {
+        case .create: return "create"
+        case .rename(let collection): return "rename-\(collection.id)"
+        }
+    }
+}

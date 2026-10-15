@@ -16,10 +16,12 @@ enum FontMCPTools {
             let widths: [String]
             let sources: [String]
             let foundries: [FoundryCount]
+            let collections: [FoundryCount]
             let weightRange: [Int]
         }
 
         var foundryCounts: [String: Int] = [:]
+        var collectionCounts: [String: Int] = [:]
         var classifications: Set<String> = []
         var widths: Set<String> = []
         var sources: Set<String> = []
@@ -30,6 +32,7 @@ enum FontMCPTools {
             classifications.insert(record.classification)
             widths.insert(record.width)
             sources.insert(record.source)
+            for collection in record.collections { collectionCounts[collection, default: 0] += 1 }
             for face in record.faces {
                 minWeight = min(minWeight, face.weight)
                 maxWeight = max(maxWeight, face.weight)
@@ -46,6 +49,9 @@ enum FontMCPTools {
             widths: widths.sorted(),
             sources: sources.sorted(),
             foundries: foundries,
+            collections: collectionCounts
+                .map { FoundryCount(name: $0.key, count: $0.value) }
+                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
             weightRange: records.isEmpty ? [] : [minWeight, maxWeight]
         )
         return encoded(result, summary: "\(records.count) families available.")
@@ -58,6 +64,7 @@ enum FontMCPTools {
         let classifications = Set(stringArray(args["classification"]).map { $0.lowercased() })
         let widths = Set(stringArray(args["width"]).map { $0.lowercased() })
         let sources = Set(stringArray(args["source"]).map { $0.lowercased() })
+        let collections = Set(stringArray(args["collection"]).map { $0.lowercased() })
         let weightMin = args["weightMin"]?.intValue
         let weightMax = args["weightMax"]?.intValue
         let includeSpecimen = args["includeSpecimen"]?.boolValue ?? false
@@ -70,6 +77,7 @@ enum FontMCPTools {
             if !classifications.isEmpty, !classifications.contains(record.classification.lowercased()) { return false }
             if !widths.isEmpty, !widths.contains(record.width.lowercased()) { return false }
             if !sources.isEmpty, !sources.contains(record.source.lowercased()) { return false }
+            if !collections.isEmpty, !record.collections.contains(where: { collections.contains($0.lowercased()) }) { return false }
             if weightMin != nil || weightMax != nil {
                 let lo = weightMin ?? Int.min, hi = weightMax ?? Int.max
                 if !record.faces.contains(where: { $0.weight >= lo && $0.weight <= hi }) { return false }
@@ -108,6 +116,7 @@ enum FontMCPTools {
 
         struct FamilyDTO: Codable {
             let family, foundry, classification, width, source: String
+            let collections: [String]
             let active: Bool
             let dateAdded: String?
             let faces: [FontFace]
@@ -135,6 +144,7 @@ enum FontMCPTools {
                 classification: record.classification,
                 width: record.width,
                 source: record.source,
+                collections: record.collections,
                 active: record.active,
                 dateAdded: record.dateAdded.map { iso.string(from: $0) },
                 faces: record.faces,
@@ -144,7 +154,7 @@ enum FontMCPTools {
 
         let result = FindResult(total: matches.count, offset: offset, limit: limit, returned: families.count, families: families)
 
-        let noFilters = query == nil && classifications.isEmpty && widths.isEmpty && sources.isEmpty && weightMin == nil && weightMax == nil
+        let noFilters = query == nil && classifications.isEmpty && widths.isEmpty && sources.isEmpty && collections.isEmpty && weightMin == nil && weightMax == nil
         let summary: String
         if let query, !query.isEmpty {
             if usedFuzzy {
@@ -163,9 +173,31 @@ enum FontMCPTools {
     // MARK: - get_font
 
     static func getFont(_ records: [FontRecord], _ args: [String: Value]) -> CallTool.Result {
-        let faceNames = stringArray(args["faces"])
+        var faceNames = stringArray(args["faces"])
+        // Or fetch by family name, optionally narrowed to CSS weights and/or style words
+        // ("Italic") — saves a find_fonts round trip.
+        if let familyName = args["family"]?.stringValue {
+            guard let record = records.first(where: { $0.family.caseInsensitiveCompare(familyName) == .orderedSame }) else {
+                return errorResult("No family named '\(familyName)'. Use find_fonts with `name` to look it up.")
+            }
+            let weights = Set((args["weights"]?.arrayValue ?? []).compactMap(\.intValue))
+            let styleWords = stringArray(args["styles"]).map { $0.lowercased() }
+            // With `styles`, italics come back only when asked for — "Regular" shouldn't
+            // also match "Regular Italic".
+            let wantsItalic = styleWords.contains { $0.contains("italic") || $0.contains("oblique") }
+            let picked = record.faces.filter { face in
+                let style = face.style.lowercased()
+                let isItalic = style.contains("italic") || style.contains("oblique")
+                return (weights.isEmpty || weights.contains(face.weight))
+                    && (styleWords.isEmpty || (styleWords.contains { style.contains($0) } && isItalic == wantsItalic))
+            }
+            guard !picked.isEmpty else {
+                return errorResult("'\(record.family)' has no faces matching those weights/styles. Available: \(record.faces.map { "\($0.style) (\($0.weight))" }.joined(separator: ", ")).")
+            }
+            faceNames += picked.map(\.postScriptName)
+        }
         guard !faceNames.isEmpty else {
-            return errorResult("`faces` is required: an array of PostScript names from find_fonts.")
+            return errorResult("Pass `faces` (PostScript names from find_fonts) or `family` (optionally with `weights` / `styles`).")
         }
         let format = args["format"]?.stringValue?.lowercased() ?? "woff2"
         let destination = args["destination"]?.stringValue
@@ -324,25 +356,25 @@ enum FontMCPTools {
     }
 
     /// The face best representing a family in previews: CSS weight closest to Regular (400).
-    private static func representativeMember(_ record: FontRecord) -> FontMember? {
+    static func representativeMember(_ record: FontRecord) -> FontMember? {
         record.members.min {
             abs(CSSWeight.fromStyle($0.styleName) - 400) < abs(CSSWeight.fromStyle($1.styleName) - 400)
         }
     }
 
     /// Accepts either a JSON array of strings or a single string, returning `[String]`.
-    private static func stringArray(_ value: Value?) -> [String] {
+    static func stringArray(_ value: Value?) -> [String] {
         guard let value else { return [] }
         if let array = value.arrayValue { return array.compactMap { $0.stringValue } }
         if let single = value.stringValue { return [single] }
         return []
     }
 
-    private static func errorResult(_ message: String) -> CallTool.Result {
+    static func errorResult(_ message: String) -> CallTool.Result {
         CallTool.Result(content: [.text(message)], isError: true)
     }
 
-    private static func encoded<T: Codable>(_ payload: T, summary: String, extraContent: [Tool.Content] = []) -> CallTool.Result {
+    static func encoded<T: Codable>(_ payload: T, summary: String, extraContent: [Tool.Content] = []) -> CallTool.Result {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         let json = (try? encoder.encode(payload)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"

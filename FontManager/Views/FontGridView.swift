@@ -104,11 +104,21 @@ struct FontGridView: View {
 
     private var emptyState: some View {
         VStack(spacing: 10) {
-            PhIcon(fontService.hasActiveFilters ? .funnel : .textAa, size: 40)
-                .foregroundStyle(.tertiary)
-            Text(fontService.hasActiveFilters ? "No fonts match your filters" : "No fonts found")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+            if let collection = fontService.activeCollection, fontService.count(in: collection) == 0 {
+                PhIcon(.folderSimple, size: 40)
+                    .foregroundStyle(.tertiary)
+                Text("\(collection.name) is empty")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                Text("Drag fonts onto it in the sidebar, or right-click any font → Add to Collection.")
+                    .foregroundStyle(.tertiary)
+            } else {
+                PhIcon(fontService.hasActiveFilters ? .funnel : .textAa, size: 40)
+                    .foregroundStyle(.tertiary)
+                Text(fontService.hasActiveFilters ? "No fonts match your filters" : "No fonts found")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
             if fontService.hasActiveFilters {
                 Button("Clear Filters") { fontService.clearFilters() }
             }
@@ -237,6 +247,8 @@ struct FontRowLargeView: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help("Show \(font.familyName)")
+        .draggable(font.familyName)   // drop onto a sidebar collection to add it
+        .contextMenu { FontContextMenu(font: font) }
     }
 }
 
@@ -310,5 +322,7 @@ struct FontCardView: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help("Show \(font.familyName)")
+        .draggable(font.familyName)   // drop onto a sidebar collection to add it
+        .contextMenu { FontContextMenu(font: font) }
     }
 }

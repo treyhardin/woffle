@@ -15,7 +15,7 @@ An actually good font management app for macOS.
 - Preview fonts with customizable sample text and sizes
 - Activate and deactivate fonts without deleting them
 - Search and filter by font name, family, style, or classification
-- Group fonts by family, collection, or custom tags
+- Group fonts into user-made collections (sidebar; drag fonts onto a collection to add)
 
 ## Architecture
 
@@ -39,6 +39,7 @@ FontManager/
 ├── FontManager-AppStore.entitlements # App Store build: sandboxed (+ bookmarks, network server)
 ├── PrivacyInfo.xcprivacy           # Privacy manifest (UserDefaults, file timestamps)
 ├── Resources/Acknowledgements.txt  # Third-party notices (scripts/generate-acknowledgements.sh)
+├── Resources/Fonts/PirataOne/      # OFL font for the Blackletter filter label (loaded, never registered)
 ├── FontManager-Bridging-Header.h   # Exposes WOFF2Kit to Swift
 ├── Models/
 │   └── FontItem.swift              # FontItem and FontMember data models
@@ -49,6 +50,8 @@ FontManager/
 │   ├── DirectoriesView.swift       # Browse fonts by source directory
 │   ├── ConversionToast.swift       # Progress/result toast
 │   ├── AlphabetScrubber.swift      # A–Z jump bar (sidebar + browse pane)
+│   ├── CollectionsViews.swift      # Sidebar collections, Add to Collection menu, name alert
+│   ├── ReviewSuggestionsView.swift # Toolbar Review button + sheet for AI-suggested edits
 │   ├── WelcomeView.swift           # First-launch welcome + Get Started banner
 │   ├── Tips.swift                  # TipKit contextual tips
 │   ├── SettingsView.swift          # Settings (Updates section open-source only)
@@ -57,6 +60,10 @@ FontManager/
 │   └── PhIcon.swift                # Ph enum + PhIcon/PhLabel for vendored Phosphor icons
 └── Services/
     ├── FontService.swift           # Enumeration, activation, imported fonts, filtering
+    ├── AppEnvironment.swift        # Data location + ephemeral Preview mode (open-source Debug)
+    ├── BundledFonts.swift          # Loads bundled UI fonts from file (not registered with macOS)
+    ├── FontService+Collections.swift # Collections CRUD + collections.json persistence
+    ├── FontService+Suggestions.swift # AI suggestion queue (accept/reject) + suggestions.json
     ├── BookmarkStore.swift         # Security-scoped bookmarks for folders/imports
     ├── FontClassifier.swift        # Serif/sans/script… from CoreText traits + PANOSE
     ├── FontConversionEngine.swift  # Pure SFNT/WOFF plumbing (no app types)
@@ -70,6 +77,8 @@ FontManager/
         ├── TailnetOriginValidator.swift # Allows loopback/Tailscale/*.ts.net hosts
         ├── FontMCPTools.swift         # find_fonts / get_font / list_attributes logic
         ├── FontMCPWrite.swift         # set_font_attributes (override edits via FontService)
+        ├── FontMCPInfo.swift          # get_font_info (licensing), compare_fonts, convert_font
+        ├── FontMCPActions.swift       # collections, set_fonts_active, refresh, suggestions
         ├── FontMCPModels.swift        # Catalog snapshot, CSS weight, specimen render
         └── MCPSettingsView.swift      # "MCP Server" section in Settings
 
@@ -87,6 +96,17 @@ SF Symbols, so they take an explicit point size and don't auto-scale to font. Me
 checkmarks intentionally stay SF Symbols (`checkmark`) since macOS manages their layout.
 To add an icon: drop `assets/regular/<name>.svg` from `phosphor-icons/core` into a new
 `ph-<name>.imageset` and add a `Ph` case.
+
+## Data and Preview mode
+
+The **App Store build is the maintainer's real-data app** during development (sandbox
+container `~/Library/Containers/co.trumancreative.FontManager`). The **open-source Debug
+build is "Font Manager (Preview)"** (bundle ID `co.trumancreative.FontManager.preview`): it
+wipes its settings, collections, edits, suggestions and tips on every launch
+(`AppEnvironment.resetIfPreview`) — for testing first-run flows. Font activation is
+system-wide in macOS, so Preview's activations are real. To test MCP in Preview without
+persisting anything, pass settings as launch arguments:
+`open "Font Manager (Preview).app" --args -mcp.enabled YES -mcp.port 8789 -mcp.allowWrites YES`.
 
 ## Two builds
 
@@ -144,20 +164,34 @@ single-shot, so `FontMCPServer` rebuilds a clean server on each `initialize` (li
 stay long-lived) — lets any client/reconnect handshake cleanly.
 
 **Read tools** (`FontMCPTools`): `list_attributes` (classifications, widths, sources,
-foundries+counts, weight range); `find_fonts` (name/classification/width/source/weight
-filters, ranked+typo-tolerant name search, pagination, opt-in PNG specimens); `get_font`
+foundries+counts, collections+counts, weight range); `find_fonts` (name/classification/width/
+source/collection/weight filters, ranked+typo-tolerant name search, pagination, opt-in PNG specimens); `get_font`
 (deliver faces as woff2 default / woff / otf / ttf — base64 bytes by default, or written
-to a Mac-reachable `destination`; includes a correct `@font-face`). The catalog is
+to a Mac-reachable `destination` — in the App Store build only inside the MCP Delivery Folder
+or a source folder; includes a correct `@font-face`). Apple system fonts are never delivered. The catalog is
 snapshotted per request on the main actor (override-aware) via
 `FontCatalog.snapshotWhenReady`, which briefly waits if enumeration is still in flight.
 CSS numeric weight (100–900) is derived from the style name — `FontMember.weight` is an
 internal CoreText scale, not CSS weight.
 
-**Write tool** (`FontMCPWrite`): `set_font_attributes` lets a client curate the catalogue
+**Goal: agent parity.** Anything a user can do in the app, an agent can do over MCP, with bulk
+metadata cleanup as the headline use. Additional read tools: `get_font_info` (detected vs.
+effective values, overrides, collections, files, name-table licensing + decoded OS/2 embedding
+permissions), `compare_fonts` (one labeled side-by-side PNG), `convert_font` (stateless, bytes
+in/out), and `get_font` by `family` + `weights`/`styles`. Always allowed:
+`suggest_font_attributes` / `list_suggestions` (the **preferred** edit path — suggestions queue
+in the app's Review Suggestions sheet and change nothing until the user accepts) and
+`refresh_library`. Behind **"Allow changes"** (`mcp.allowWrites`): `set_font_attributes`,
+`create_collection`, `update_collection`, `set_fonts_active`. Settings → MCP Server →
+"Connect an AI Tool…" gives copy-paste setup for Claude Code, Claude Desktop (via
+`mcp-remote`), and URL-based clients. Not exposed by design: adding/removing source folders
+and changing the app's own settings (both need a person at the Mac).
+
+**Direct edits** (`FontMCPWrite`): `set_font_attributes` lets a client curate the catalogue
 — batch-edit foundry / classification / width overrides (or `clear` them) per family,
 through the same `FontService` setters the UI uses, so edits persist and update the app
 live. **Gated behind the `mcp.allowWrites` setting (default off)** — Settings → MCP Server
-→ "Allow attribute editing"; refused with an error when off. Policy: by default only
+→ "Allow changes"; refused with an error when off. Policy: by default only
 *fills gaps* (Unknown foundry, Unclassified classification, un-overridden width) and never
 overwrites an existing value — `force:true` overwrites. Returns per-family applied/skipped
 results plus resulting effective values so the agent can verify. (The gap-fill default

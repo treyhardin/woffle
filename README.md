@@ -51,13 +51,19 @@ check finds one (toggle in **Settings → Updates**).
 - **Card grid** — browse all fonts as specimen cards with your own live preview text;
   click any card for full detail.
 - **Auto-sync** — source folders are watched, so fonts you drop in appear automatically,
-  with a toolbar indicator showing sync status and when the library last refreshed.
+  with a toolbar indicator showing when the library last refreshed. Click it (or press ⌘R)
+  to rescan now — handy for network drives changed from another machine.
 - **Override Style / Width / Foundry** — when auto-detection is missing or wrong, edit the
   values yourself (foundry with autocomplete against your existing names). Overrides live
   only in this app (font files are untouched), persist on-device, and revert per-field.
   A **Needs Style** toggle surfaces every font that still needs classifying.
+- **Collections** — group fonts for a project or client. Collections live in the sidebar;
+  add fonts by dragging them onto a collection or from the right-click menu, and activate or
+  deactivate a whole collection at once.
+- **AI tools (MCP)** — connect Claude or other assistants to search your library, compare
+  fonts, pull files converted for the web, read licensing info, and manage collections. For
+  metadata cleanup they *suggest* edits, and you accept or reject them in Review Suggestions.
 - **Multi-select** to bulk edit, activate/deactivate, or export many families at once.
-- **Group** fonts by family, collection, or source directory.
 - **Download as…** — export any font to your choice of format (desktop OTF/TTF,
   WOFF, or WOFF2), per style or the whole family at once. Conversion is invisible:
   pick a format and you get the file. (Apple's built-in system fonts are excluded — their

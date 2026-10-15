@@ -85,6 +85,12 @@ targets:
           - "$(SRCROOT)/WOFF2Kit"
         OTHER_LDFLAGS:
           - "-lc++"
+      configs:
+        # "Preview": its own identity and a throwaway data folder, wiped every launch
+        # (see AppEnvironment) — for testing first-run flows without touching real data.
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: co.trumancreative.FontManager.preview
+          PRODUCT_NAME: Font Manager (Preview)
     entitlements:
       path: FontManager/FontManager.entitlements
       properties:

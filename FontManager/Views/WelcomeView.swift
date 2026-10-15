@@ -26,11 +26,11 @@ struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 WelcomeFeatureRow(icon: .folder,
                                   title: "Your whole library, wherever it lives",
-                                  detail: "Add folders from this Mac, an external drive, or a NAS. Fonts stay where they are, and new ones show up automatically.")
+                                  detail: "Add folders from this Mac, an external drive, or a NAS. Your fonts stay right where they are.")
                 WelcomeFeatureRow(icon: .pencilSimple,
                                   title: "Organized your way",
-                                  detail: "Label fonts by style, width, and foundry, find anything in a click, and turn fonts on only when you need them.")
-                WelcomeFeatureRow(icon: .magnifyingGlass,
+                                  detail: "Label fonts by style, width, and foundry, group them into collections, and turn fonts on only when you need them.")
+                WelcomeFeatureRow(icon: .sparkle,
                                   title: "Your fonts, inside your AI tools",
                                   detail: "Connect Claude or other AI assistants to search your library and pull the exact fonts a project needs.")
                 WelcomeFeatureRow(icon: .arrowsClockwise,

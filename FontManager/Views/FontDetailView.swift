@@ -123,6 +123,16 @@ struct FontDetailView: View {
                     .help(font.exportableMembers.isEmpty ? Self.systemExportNote : "Download all styles…")
                 }
 
+                Menu {
+                    CollectionMenuItems(fonts: [font])
+                } label: {
+                    PhIcon(.folderSimplePlus, size: 16)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .help("Add to Collection")
+
                 Button(isEditing ? "Done" : "Edit") {
                     isEditing.toggle()
                 }
@@ -488,6 +498,12 @@ struct MultiFontDetailView: View {
                     }
 
                     Spacer()
+
+                    Menu("Collections") {
+                        CollectionMenuItems(fonts: fonts)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
 
                     Menu("Download All") {
                         ForEach(ExportFormat.supported) { format in

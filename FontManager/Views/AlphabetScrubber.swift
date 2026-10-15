@@ -39,65 +39,36 @@ struct AlphabetIndex {
     }
 }
 
-/// A slim vertical A–Z bar. Click or drag along it to jump the list to a letter; letters
-/// with no fonts are dimmed (and jump to the nearest one that has fonts). When the bar is
-/// too short for every letter, it shows an evenly spaced subset — dragging still reaches all.
+/// The A–Z bar's visuals only. It never takes mouse events itself — a SwiftUI overlay that
+/// does would swallow scroll-wheel input meant for the list underneath — so clicks and drags
+/// are handled by `ScrubberEventMonitor` instead. When the bar is too short for every letter,
+/// it labels an evenly spaced subset; dragging still reaches all of them.
 struct AlphabetScrubber: View {
     let index: AlphabetIndex
-    let onSelect: (String) -> Void
-    /// True while the pointer is over the bar or dragging it, so the parent keeps it shown.
-    @Binding var isInteracting: Bool
-
-    @State private var activeLetter: String?
-    @State private var hovering = false
-    private let rowHeight: CGFloat = 14
+    let barHeight: CGFloat
+    let activeLetter: String?
+    static let width: CGFloat = 16
+    static let rowHeight: CGFloat = 14
+    static let innerPadding: CGFloat = 4
 
     var body: some View {
-        GeometryReader { geo in
-            let letters = index.letters
-            let barHeight = min(geo.size.height, CGFloat(letters.count) * rowHeight)
-            let step = max(1, Int((CGFloat(letters.count) * rowHeight / max(barHeight, 1)).rounded(.up)))
-            let shown = letters.enumerated().filter { $0.offset % step == 0 }.map(\.element)
+        let letters = index.letters
+        let step = max(1, Int((CGFloat(letters.count) * Self.rowHeight / max(barHeight, 1)).rounded(.up)))
+        let shown = letters.enumerated().filter { $0.offset % step == 0 }.map(\.element)
 
-            VStack(spacing: 0) {
-                ForEach(shown, id: \.self) { letter in
-                    Text(letter)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(color(for: letter))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+        VStack(spacing: 0) {
+            ForEach(shown, id: \.self) { letter in
+                Text(letter)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(color(for: letter))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(width: 16, height: barHeight)
-            .padding(.vertical, 4)
-            .background(.regularMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5))
-            .contentShape(Capsule())
-            .gesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                    .onChanged { value in
-                        // Map the pointer's height over the whole bar to a letter, so every
-                        // letter is reachable even when only a subset is labeled.
-                        let y = value.location.y - 4
-                        let i = min(letters.count - 1, max(0, Int(y / barHeight * CGFloat(letters.count))))
-                        let letter = letters[i]
-                        isInteracting = true
-                        guard letter != activeLetter else { return }
-                        activeLetter = letter
-                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                        onSelect(letter)
-                    }
-                    .onEnded { _ in
-                        activeLetter = nil
-                        isInteracting = hovering
-                    }
-            )
-            .onHover { inside in
-                hovering = inside
-                isInteracting = inside || activeLetter != nil
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 16)
+        .frame(width: Self.width, height: barHeight)
+        .padding(.vertical, Self.innerPadding)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5))
+        .allowsHitTesting(false)
         .accessibilityHidden(true)  // A pointer convenience; the list itself stays navigable.
     }
 
@@ -124,92 +95,167 @@ private struct AlphabetScrubberOverlay: ViewModifier {
 
     @State private var recentlyScrolled = false
     @State private var pointerNearEdge = false
-    @State private var interacting = false
-    @State private var hideTask: Task<Void, Never>?
-    @State private var width: CGFloat = 0
+    @State private var activeLetter: String?
+    @State private var size: CGSize = .zero
+    /// Held outside view state so rescheduling on every wheel tick doesn't redraw the list.
+    @State private var hideTimer = HideTimer()
 
     /// Short lists don't need a scrubber.
     private static let minimumCount = 20
     /// How close to the trailing edge the pointer must be to reveal the bar.
-    private static let edgeZone: CGFloat = 48
+    private static let edgeZone: CGFloat = 56
 
-    private var isVisible: Bool { recentlyScrolled || pointerNearEdge || interacting }
+    private var isEnabled: Bool { fonts.count >= Self.minimumCount }
+    private var isVisible: Bool { isEnabled && (recentlyScrolled || pointerNearEdge || activeLetter != nil) }
+
+    /// Clear of the scroll bar: always-visible ("legacy") scroll bars, shown when a mouse is
+    /// connected, take ~15pt at the edge; overlay scroll bars float over content.
+    private var trailingInset: CGFloat {
+        NSScroller.preferredScrollerStyle == .legacy
+            ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) + 6
+            : 14
+    }
+
+    private var barHeight: CGFloat {
+        let letterCount = CGFloat(AlphabetIndex(fonts: [], descending: descending).letters.count)
+        return max(0, min(size.height - 28, letterCount * AlphabetScrubber.rowHeight))
+    }
+
+    /// The bar's frame in this view's (top-left origin) coordinates.
+    private var barRect: CGRect {
+        let height = barHeight + AlphabetScrubber.innerPadding * 2
+        return CGRect(x: size.width - trailingInset - AlphabetScrubber.width, y: (size.height - height) / 2,
+                      width: AlphabetScrubber.width, height: height)
+    }
 
     func body(content: Content) -> some View {
+        let index = AlphabetIndex(fonts: isEnabled ? fonts : [], descending: descending)
         content
-            .background(ScrollWheelObserver { didScroll() })
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .background(ScrubberEventMonitor(
+                barRect: isVisible ? barRect : nil,
+                onScroll: didScroll,
+                onDrag: { point in
+                    if let point { select(at: point, in: index) } else { activeLetter = nil }
+                }
+            ))
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
             .onContinuousHover { phase in
                 let near: Bool
-                if case .active(let point) = phase { near = point.x > width - Self.edgeZone } else { near = false }
+                if case .active(let point) = phase { near = point.x > size.width - Self.edgeZone } else { near = false }
                 if near != pointerNearEdge { pointerNearEdge = near }
             }
-            .overlay(alignment: .trailing) {
-                if fonts.count >= Self.minimumCount {
-                    let index = AlphabetIndex(fonts: fonts, descending: descending)
-                    AlphabetScrubber(index: index, onSelect: { letter in
-                        if let id = index.target(for: letter) {
-                            proxy.scrollTo(id, anchor: .top)
-                        }
-                    }, isInteracting: $interacting)
-                    .padding(.vertical, 10)
-                    // Sits just left of the overlay scroll bar.
-                    .padding(.trailing, 14)
-                    .opacity(isVisible ? 1 : 0)
-                    .offset(x: isVisible ? 0 : 6)
-                    .allowsHitTesting(isVisible)
-                    .animation(.easeOut(duration: 0.2), value: isVisible)
+            .overlay(alignment: .topLeading) {
+                if isEnabled {
+                    AlphabetScrubber(index: index, barHeight: barHeight, activeLetter: activeLetter)
+                        .offset(x: barRect.minX + (isVisible ? 0 : 6), y: barRect.minY)
+                        .opacity(isVisible ? 1 : 0)
+                        .animation(.easeOut(duration: 0.2), value: isVisible)
                 }
             }
     }
 
+    /// Maps the pointer's height over the whole bar to a letter, so every letter is
+    /// reachable even when only a subset is labeled.
+    private func select(at point: CGPoint, in index: AlphabetIndex) {
+        let letters = index.letters
+        guard !letters.isEmpty, barHeight > 0 else { return }
+        let y = point.y - barRect.minY - AlphabetScrubber.innerPadding
+        let i = min(letters.count - 1, max(0, Int(y / barHeight * CGFloat(letters.count))))
+        let letter = letters[i]
+        guard letter != activeLetter else { return }
+        activeLetter = letter
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        if let id = index.target(for: letter) { proxy.scrollTo(id, anchor: .top) }
+    }
+
     private func didScroll() {
         if !recentlyScrolled { recentlyScrolled = true }
-        hideTask?.cancel()
-        hideTask = Task {
-            try? await Task.sleep(for: .seconds(1.2))
+        hideTimer.schedule(after: 1.2) { recentlyScrolled = false }
+    }
+}
+
+/// Debounced hide timer kept in a reference so rescheduling doesn't invalidate the view.
+@MainActor
+private final class HideTimer {
+    private var task: Task<Void, Never>?
+
+    func schedule(after seconds: Double, _ action: @escaping @MainActor () -> Void) {
+        task?.cancel()
+        task = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
-            recentlyScrolled = false
+            action()
         }
     }
 }
 
-/// Calls `onScroll` for scroll-wheel/trackpad events over this view (momentum included).
-/// A local event monitor rather than a scroll-offset observer, so it works on macOS 14 and
-/// never reaches into the List's internals. Transparent to clicks.
-struct ScrollWheelObserver: NSViewRepresentable {
+/// Watches events over the list via a local event monitor (works on macOS 14 and never reaches
+/// into the List's internals):
+/// - scroll-wheel/trackpad scrolls → `onScroll` (events always continue to the list);
+/// - clicks and drags that start on the visible bar → `onDrag(point)`, then `onDrag(nil)` on
+///   release. Those are consumed so they don't also select a row underneath.
+/// The view itself is transparent to clicks.
+private struct ScrubberEventMonitor: NSViewRepresentable {
+    /// The bar's frame (top-left origin) while it's visible; nil when hidden.
+    let barRect: CGRect?
     let onScroll: () -> Void
+    let onDrag: (CGPoint?) -> Void
 
-    func makeNSView(context: Context) -> ObserverView {
-        let view = ObserverView()
+    func makeNSView(context: Context) -> MonitorView { update(MonitorView()) }
+    func updateNSView(_ view: MonitorView, context: Context) { _ = update(view) }
+
+    private func update(_ view: MonitorView) -> MonitorView {
+        view.barRect = barRect
         view.onScroll = onScroll
+        view.onDrag = onDrag
         return view
     }
 
-    func updateNSView(_ view: ObserverView, context: Context) {
-        view.onScroll = onScroll
-    }
-
-    final class ObserverView: NSView {
+    final class MonitorView: NSView {
+        var barRect: CGRect?
         var onScroll: (() -> Void)?
+        var onDrag: ((CGPoint?) -> Void)?
         private var monitor: Any?
+        private var dragging = false
+
+        // Match SwiftUI's top-left origin so `barRect` needs no conversion.
+        override var isFlipped: Bool { true }
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             if let monitor { NSEvent.removeMonitor(monitor) }
             monitor = nil
             guard window != nil else { return }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-                MainActor.assumeIsolated {
-                    if let self, event.window === self.window,
-                       self.bounds.contains(self.convert(event.locationInWindow, from: nil)) {
-                        self.onScroll?()
-                    }
-                }
-                return event
+            monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .leftMouseDown, .leftMouseDragged, .leftMouseUp]) { [weak self] event in
+                // NSEvent isn't Sendable, so decide inside and pass the event through outside.
+                let consume = MainActor.assumeIsolated { self?.shouldConsume(event) ?? false }
+                return consume ? nil : event
             }
         }
 
-        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        private func shouldConsume(_ event: NSEvent) -> Bool {
+            guard event.window === window else { return false }
+            let point = convert(event.locationInWindow, from: nil)
+            switch event.type {
+            case .scrollWheel:
+                if bounds.contains(point) { onScroll?() }
+                return false
+            case .leftMouseDown:
+                guard let barRect, barRect.insetBy(dx: -4, dy: 0).contains(point) else { return false }
+                dragging = true
+                onDrag?(point)
+                return true
+            case .leftMouseDragged where dragging:
+                onDrag?(point)
+                return true
+            case .leftMouseUp where dragging:
+                dragging = false
+                onDrag?(nil)
+                return true
+            default:
+                return false
+            }
+        }
     }
 }

@@ -85,6 +85,9 @@ struct ContentView: View {
                     SyncStatusView()
                 }
             }
+            ToolbarItem(placement: .primaryAction) {
+                ReviewSuggestionsButton()
+            }
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     conversion.showConvert = true
@@ -106,6 +109,8 @@ struct ContentView: View {
             }
         }
         .toolbarRole(.editor)
+        .navigationTitle(fontService.activeCollection?.name ?? "Font Manager")
+        .modifier(CollectionNameAlert())
         .sheet(isPresented: $showingDirectories) {
             DirectoriesView()
         }
@@ -186,24 +191,43 @@ struct ContentView: View {
 struct SyncStatusView: View {
     @EnvironmentObject var fontService: FontService
 
+    @State private var hovering = false
+
     var body: some View {
-        HStack(spacing: 5) {
-            if fontService.isSyncing {
-                SpinningArrow()
-                Text("Syncing…")
-            } else {
-                Circle()
-                    .fill(.green)
-                    .frame(width: 7, height: 7)
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    Text(Self.syncedText(fontService.lastSyncedAt, now: context.date))
+        // Click to rescan now — folder watching can miss changes made from other machines
+        // (e.g. fonts added to a NAS elsewhere).
+        Button {
+            fontService.loadAllFonts()
+        } label: {
+            HStack(spacing: 5) {
+                if fontService.isSyncing {
+                    SpinningArrow()
+                    Text("Syncing…")
+                } else if hovering {
+                    PhIcon(.arrowsClockwise, size: 13)
+                    Text("Sync Now")
+                } else {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 7, height: 7)
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        Text(Self.syncedText(fontService.lastSyncedAt, now: context.date))
+                    }
                 }
             }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .contentShape(Rectangle())
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .help("Source folders auto-refresh when fonts are added or removed")
-        .accessibilityElement(children: .combine)
+        .buttonStyle(.plain)
+        .disabled(fontService.isSyncing)
+        .onHover { inside in
+            hovering = inside
+            // Pointing hand so it reads as clickable.
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+        .help("Rescan your font folders now (⌘R)")
+        .accessibilityLabel(fontService.isSyncing ? "Syncing" : "Sync now")
     }
 
     private static func syncedText(_ date: Date?, now: Date) -> String {

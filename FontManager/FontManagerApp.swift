@@ -15,6 +15,7 @@ struct FontManagerApp: App {
     @StateObject private var mcpController = MCPServerController()
 
     init() {
+        AppEnvironment.resetIfPreview()
         WelcomeView.skipForExistingUsers()
         AppTips.configure()
         let toast = ToastCenter()
@@ -58,6 +59,14 @@ struct FontManagerApp: App {
                 }
                 Divider()
                 AcknowledgementsCommand()
+            }
+            CommandGroup(before: .toolbar) {
+                Button("Refresh Library") {
+                    fontService.loadAllFonts()
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(fontService.isSyncing)
+                Divider()
             }
             CommandGroup(after: .textEditing) {
                 Button("Find") {

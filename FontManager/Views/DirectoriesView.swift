@@ -92,9 +92,17 @@ struct DirectoryRow: View {
 
             Spacer()
 
-            Text("\(fontCount) families")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if fontService.canRead(directory: path) {
+                Text("\(fontCount) families")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                PhIcon(.warning, size: 14)
+                    .foregroundStyle(.orange)
+                    .help("Font Manager doesn't have permission to read this folder.")
+                Button("Grant Access…") { fontService.grantAccess(to: path) }
+                    .controlSize(.small)
+            }
 
             Button {
                 fontService.removeDirectory(path)

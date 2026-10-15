@@ -4,14 +4,56 @@ import TipKit
 struct FontListView: View {
     @EnvironmentObject var fontService: FontService
     @FocusState private var searchFocused: Bool
-    @ScaledMetric(relativeTo: .body) private var styleGlyphSize: CGFloat = 15
+    @ScaledMetric(relativeTo: .body) private var chipTextSize: CGFloat = 15
     private let actionsTip = SidebarActionsTip()
-    var body: some View {
-        VStack(spacing: 0) {
-            // Compact filter header
-            VStack(spacing: 6) {
-                SidebarSearchField(text: $fontService.searchText, focused: $searchFocused)
+    /// Natural height of the filters + collections block, measured so it can be capped.
+    @State private var topSectionHeight: CGFloat = 0
+    /// The filters/collections block never takes more than this share of the sidebar — past
+    /// that it scrolls on its own, so the sidebar can't grow taller than the window (which
+    /// would push the whole window's layout, main panel included, past its edges).
+    private let topSectionMaxShare: CGFloat = 0.55
 
+    var body: some View {
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                SidebarSearchField(text: $fontService.searchText, focused: $searchFocused)
+                    .padding([.horizontal, .top], 8)
+                    .padding(.bottom, 6)
+
+                ScrollView {
+                    topSection
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topSectionHeight = $0 }
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(height: min(topSectionHeight, geo.size.height * topSectionMaxShare))
+
+                Divider()
+
+                if fontService.filteredFonts.isEmpty {
+                    emptyState
+                } else {
+                    ScrollViewReader { proxy in
+                        List(fontService.filteredFonts, selection: $fontService.selection) { font in
+                            FontRowView(font: font)
+                        }
+                        .listStyle(.sidebar)
+                        .alphabetScrubber(fonts: fontService.filteredFonts, proxy: proxy)
+                    }
+                }
+
+                Divider()
+                footer
+            }
+        }
+        .onChange(of: fontService.searchFocusToken) { _, _ in
+            searchFocused = true
+        }
+    }
+
+    /// Filters, collections, and the one-time sidebar tip.
+    private var topSection: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 6) {
                 // Filter inputs stack full-width, each showing its selected value
                 // ("Foundry     All"), so the current state is always visible at a glance.
                 FilterMenuPicker(title: "Status", selection: $fontService.filterStatus) { status in
@@ -23,75 +65,47 @@ struct FontListView: View {
 
                 // Style/Width are unresolved when filtering to "Missing Info", so hide them there.
                 if fontService.filterStatus != .missingInfo {
-                    FilterSection(title: "Style", activeValue: fontService.filterClassification?.rawValue) {
+                    LabeledFilterSection(title: "Style", activeValue: fontService.filterClassification?.rawValue,
+                                         expandedKey: "filters.styleExpanded") {
                         ForEach(fontService.availableClassifications) { classification in
-                            FilterIconButton(
-                                isOn: fontService.filterClassification == classification,
-                                help: classification.rawValue
-                            ) {
+                            FilterChip(label: classification == .symbol ? "✻ Symbol" : classification.rawValue,
+                                       font: styleSpecimenFont(classification, size: chipTextSize),
+                                       isOn: fontService.filterClassification == classification) {
                                 fontService.filterClassification = fontService.filterClassification == classification ? nil : classification
-                            } label: {
-                                Text(classification == .symbol ? "✻" : "Ag")
-                                    .font(styleSpecimenFont(classification, size: styleGlyphSize))
-                                    .minimumScaleFactor(0.5)
-                                    .lineLimit(1)
-                                    // Center each specimen on its text baseline (not its line
-                                    // box) so differing font metrics — e.g. Rockwell for slab
-                                    // serif — don't sit higher or lower than the others.
-                                    .alignmentGuide(VerticalAlignment.center) { dims in
-                                        dims[.firstTextBaseline] - styleGlyphSize * 0.25
-                                    }
                             }
                         }
                     }
 
                     if fontService.availableWidths.count > 1 {
-                        FilterSection(title: "Width", activeValue: fontService.filterWidth?.rawValue) {
+                        LabeledFilterSection(title: "Width", activeValue: fontService.filterWidth?.rawValue,
+                                             expandedKey: "filters.widthExpanded",
+                                             columnCount: fontService.availableWidths.count) {
                             ForEach(fontService.availableWidths) { width in
-                                FilterIconButton(
-                                    isOn: fontService.filterWidth == width,
-                                    help: width.rawValue
-                                ) {
+                                FilterChip(label: width.rawValue,
+                                           font: widthSpecimenFont(width, size: chipTextSize),
+                                           isOn: fontService.filterWidth == width) {
                                     fontService.filterWidth = fontService.filterWidth == width ? nil : width
-                                } label: {
-                                    Text("Ag")
-                                        .font(widthSpecimenFont(width, size: styleGlyphSize))
-                                        .minimumScaleFactor(0.5)
-                                        .lineLimit(1)
-                                        .alignmentGuide(VerticalAlignment.center) { dims in
-                                            dims[.firstTextBaseline] - styleGlyphSize * 0.25
-                                        }
                                 }
                             }
                         }
                     }
                 }
             }
-            .padding(8)
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
 
             Divider()
 
-            TipView(actionsTip)
+            SidebarLibrarySection()
                 .padding(8)
 
-            if fontService.filteredFonts.isEmpty {
-                emptyState
-            } else {
-                ScrollViewReader { proxy in
-                    List(fontService.filteredFonts, selection: $fontService.selection) { font in
-                        FontRowView(font: font)
-                    }
-                    .listStyle(.sidebar)
-                    .alphabetScrubber(fonts: fontService.filteredFonts, proxy: proxy)
-                }
-            }
+            TipView(actionsTip)
+                .padding([.horizontal, .bottom], 8)
+        }
+    }
 
-            Divider()
-            footer
-        }
-        .onChange(of: fontService.searchFocusToken) { _, _ in
-            searchFocused = true
-        }
+    private var isEmptyCollection: Bool {
+        fontService.activeCollection.map { fontService.count(in: $0) == 0 } ?? false
     }
 
     private var emptyState: some View {
@@ -99,8 +113,14 @@ struct FontListView: View {
             Spacer()
             PhIcon(.magnifyingGlass, size: 26)
                 .foregroundStyle(.tertiary)
-            Text("No fonts match")
+            Text(isEmptyCollection ? "This collection is empty" : "No fonts match")
                 .foregroundStyle(.secondary)
+            if isEmptyCollection {
+                Text("Drag fonts here, or right-click a font → Add to Collection.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+            }
             if fontService.hasActiveFilters {
                 Button("Clear Filters") { fontService.clearFilters() }
                     .controlSize(.small)
@@ -269,105 +289,86 @@ struct FoundryFilterMenu: View {
     }
 }
 
-/// A titled group of filter buttons that wraps onto multiple rows when it can't fit,
-/// so the sidebar never needs horizontal scrolling and content never overflows its width.
-/// When a value is selected, the title shows it (e.g. "STYLE · Serif") so the
-/// otherwise-unlabeled specimen glyphs are legible once chosen.
-struct FilterSection<Content: View>: View {
+/// A collapsible filter group: a header (with the active value, e.g. "STYLE · Serif") over
+/// a two-column grid of labeled chips. Open/closed state is remembered per section.
+struct LabeledFilterSection<Content: View>: View {
     let title: String
     var activeValue: String? = nil
+    @AppStorage private var isExpanded: Bool
     @ViewBuilder var content: Content
 
+    private let columns: [GridItem]
+
+    init(title: String, activeValue: String? = nil, expandedKey: String, columnCount: Int = 2, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.activeValue = activeValue
+        _isExpanded = AppStorage(wrappedValue: true, expandedKey)
+        columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: columnCount)
+        self.content = content()
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Text(title.uppercased())
-                    .foregroundStyle(.secondary)
-                if let activeValue {
-                    Text("· \(activeValue)")
-                        .foregroundStyle(.tint)
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(title.uppercased())
+                        .foregroundStyle(.secondary)
+                    if let activeValue {
+                        Text("· \(activeValue)")
+                            .foregroundStyle(.tint)
+                    }
+                    Spacer()
+                    PhIcon(.caretDown, size: 11)
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 0 : -90))
                 }
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .contentShape(Rectangle())
             }
-            .font(.caption2)
-            .fontWeight(.semibold)
-            FlowLayout(spacing: 6) { content }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(title) filters")
+            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+
+            if isExpanded {
+                LazyVGrid(columns: columns, spacing: 6) { content }
+                    .transition(.opacity)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// Left-to-right wrapping layout: places children on a row until the next one would
-/// overflow the proposed width, then wraps. Keeps filter chips fully visible at any
-/// sidebar width without horizontal scrolling.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var widestRow: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > 0 && x + size.width > maxWidth {
-                y += rowHeight + spacing
-                x = 0
-                rowHeight = 0
-            }
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-            widestRow = max(widestRow, x - spacing)
-        }
-
-        let width = maxWidth == .infinity ? widestRow : maxWidth
-        return CGSize(width: width, height: y + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX
-        var y = bounds.minY
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > bounds.minX && x + size.width > bounds.maxX {
-                y += rowHeight + spacing
-                x = bounds.minX
-                rowHeight = 0
-            }
-            subview.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-    }
-}
-
-/// A square toggle button used by the Style and Width filters.
-struct FilterIconButton<Label: View>: View {
+/// A filter toggle whose label is set in a typeface that shows what it filters for
+/// ("Script" in a script face, "Condensed" in a condensed cut).
+struct FilterChip: View {
+    let label: String
+    let font: Font
     let isOn: Bool
-    let help: String
     let action: () -> Void
-    @ViewBuilder var label: Label
 
-    // Scales the button with the user's text-size preference.
-    @ScaledMetric(relativeTo: .body) private var dimension: CGFloat = 29
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 32
 
     var body: some View {
         Button(action: action) {
-            label
-                .frame(width: dimension, height: dimension)
+            Text(label)
+                .font(font)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity)
+                .frame(height: height)
                 .background(
                     isOn ? Color.accentColor : Color.secondary.opacity(0.12),
-                    in: RoundedRectangle(cornerRadius: 6)
+                    in: RoundedRectangle(cornerRadius: 7)
                 )
                 .foregroundStyle(isOn ? Color.white : Color.primary)
+                .contentShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
-        .help(help)
-        .accessibilityLabel(help)
+        .help(isOn ? "Showing \(label) only — click to clear" : "Show only \(label)")
         .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
     }
 }
@@ -389,18 +390,17 @@ struct ActivationDot: View {
     }
 }
 
-/// A representative typeface for each classification, used as the Style button glyph.
+/// A representative typeface for each classification, used for the Style chip labels. All
+/// ship with macOS except Pirata One (SIL OFL), bundled for Blackletter since macOS has none.
 func styleSpecimenFont(_ classification: FontClassification, size: CGFloat) -> Font {
     switch classification {
-    case .serif: return .system(size: size, design: .serif).weight(.semibold)
-    case .sansSerif: return .system(size: size, design: .default).weight(.semibold)
+    case .serif: return .system(size: size, design: .serif).weight(.medium)
+    case .sansSerif: return .system(size: size, design: .default).weight(.medium)
     case .slabSerif: return .custom("Rockwell", size: size)
-    case .script: return .custom("Snell Roundhand", size: size)
-    // Courier's typewriter forms read unmistakably as monospace at a glance —
-    // clearer than SF Mono, whose "Ag" looks like a plain sans.
-    case .monospaced: return .custom("Courier New", size: size).weight(.bold)
-    // No blackletter ships with macOS; a heavy serif is the least-misleading stand-in glyph.
-    case .blackletter: return .system(size: size, design: .serif).weight(.heavy)
+    // Script faces run small for their point size; nudge up so the label reads at a glance.
+    case .script: return .custom("Snell Roundhand", size: size * 1.2).weight(.semibold)
+    case .monospaced: return .system(size: size, design: .monospaced)
+    case .blackletter: return BundledFonts.pirataOne(size: size * 1.15)
     case .symbol, .unclassified: return .system(size: size)
     }
 }
@@ -452,23 +452,40 @@ struct FontRowView: View {
             ActivationDot(isActive: font.isActive)
         }
         .padding(.vertical, 2)
-        .contextMenu {
-            if font.canToggleActivation {
-                Button(font.isActive ? "Deactivate" : "Activate") {
-                    fontService.toggleFont(font)
-                }
+        .draggable(font.familyName)   // drop onto a sidebar collection to add it
+        .contextMenu { FontContextMenu(font: font) }
+    }
+}
+
+/// Right-click actions for a font (sidebar rows and browse cards). When the font is part of
+/// a multi-selection, collection actions apply to the whole selection.
+struct FontContextMenu: View {
+    @EnvironmentObject var fontService: FontService
+    let font: FontItem
+
+    private var targets: [FontItem] {
+        guard fontService.selection.count > 1, fontService.selection.contains(font.id) else { return [font] }
+        return fontService.fonts.filter { fontService.selection.contains($0.id) }
+    }
+
+    var body: some View {
+        if font.canToggleActivation {
+            Button(font.isActive ? "Deactivate" : "Activate") {
+                fontService.toggleFont(font)
             }
-            // Selects every file backing the family (deduped — styles can share one .ttc).
-            let fileURLs = Array(Set(font.members.compactMap(\.fileURL)))
-            Button("Show in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting(fileURLs)
-            }
-            .disabled(fileURLs.isEmpty)
-            if case .imported = font.source {
-                Divider()
-                Button("Remove from Library", role: .destructive) {
-                    fontService.removeImportedFont(font)
-                }
+        }
+        // Selects every file backing the family (deduped — styles can share one .ttc).
+        let fileURLs = Array(Set(font.members.compactMap(\.fileURL)))
+        Button("Show in Finder") {
+            NSWorkspace.shared.activateFileViewerSelecting(fileURLs)
+        }
+        .disabled(fileURLs.isEmpty)
+        Divider()
+        CollectionMenuItems(fonts: targets)
+        if case .imported = font.source {
+            Divider()
+            Button("Remove from Library", role: .destructive) {
+                fontService.removeImportedFont(font)
             }
         }
     }

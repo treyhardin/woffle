@@ -49,10 +49,24 @@ struct FontRecord: Sendable {
     let classification: String
     let width: String
     let source: String
+    /// Names of the user's collections this family belongs to.
+    let collections: [String]
     let active: Bool
     let dateAdded: Date?
     let faces: [FontFace]
     let members: [FontMember]
+    /// What the app detected from the font itself, before any user/agent override — lets an
+    /// agent judge whether a label came from the file or from an edit.
+    let detected: DetectedAttributes
+    let overridden: [String]
+    /// Only fonts the app registers (source folders, imports) can be activated/deactivated.
+    let canToggleActivation: Bool
+}
+
+struct DetectedAttributes: Sendable, Codable {
+    let foundry: String?
+    let classification: String
+    let width: String
 }
 
 /// Builds a Sendable snapshot of the whole catalog on the main actor, resolving user
@@ -67,6 +81,7 @@ enum FontCatalog {
                 classification: service.effectiveClassification(item).rawValue,
                 width: service.effectiveWidth(item).rawValue,
                 source: sourceLabel(item.source),
+                collections: service.collections(containing: item).map(\.name),
                 active: item.isActive,
                 dateAdded: item.dateAdded,
                 faces: item.members.map { member in
@@ -78,7 +93,18 @@ enum FontCatalog {
                         exportable: member.isExportable
                     )
                 },
-                members: item.members
+                members: item.members,
+                detected: DetectedAttributes(
+                    foundry: item.foundry,
+                    classification: item.classification.rawValue,
+                    width: item.width.rawValue
+                ),
+                overridden: [
+                    service.isFoundryOverridden(item) ? "foundry" : nil,
+                    service.isClassificationOverridden(item) ? "classification" : nil,
+                    service.isWidthOverridden(item) ? "width" : nil,
+                ].compactMap { $0 },
+                canToggleActivation: item.canToggleActivation
             )
         }
     }

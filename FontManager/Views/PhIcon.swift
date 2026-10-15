@@ -28,6 +28,10 @@ enum Ph: String {
     case checkCircle = "ph-check-circle"
     case list = "ph-list"
     case squaresFour = "ph-squares-four"
+    case sparkle = "ph-sparkle"
+    case folderSimple = "ph-folder-simple"
+    case folderSimplePlus = "ph-folder-simple-plus"
+    case caretDown = "ph-caret-down"
 
     var image: Image { Image(rawValue).renderingMode(.template) }
 }

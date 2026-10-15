@@ -1,10 +1,12 @@
 import SwiftUI
+import AppKit
 
 /// Settings section for the MCP server: enable toggle, port, live status, and the
 /// reachable URLs (localhost + Tailscale) for pasting into an MCP client config.
 struct MCPSettingsView: View {
     @EnvironmentObject private var mcp: MCPServerController
     @AppStorage("mcp.allowWrites") private var allowWrites = false
+    @State private var showingConnect = false
 
     var body: some View {
         Section("MCP Server") {
@@ -16,8 +18,8 @@ struct MCPSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Toggle("Allow attribute editing", isOn: $allowWrites)
-            Text("Lets connected tools edit font metadata — foundry, style, and width — in your library. Off by default; reading and pulling fonts don't require this.")
+            Toggle("Allow changes", isOn: $allowWrites)
+            Text("Lets connected tools edit font details, manage collections, and activate or deactivate fonts directly. Off by default — tools can still search, pull fonts, and suggest edits for you to review.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -68,7 +70,121 @@ struct MCPSettingsView: View {
                             .textSelection(.enabled)
                     }
                 }
+
+                Button {
+                    showingConnect = true
+                } label: {
+                    PhLabel("Connect an AI Tool…", icon: .sparkle)
+                }
+                .sheet(isPresented: $showingConnect) {
+                    ConnectAIToolView(urls: mcp.reachableURLs)
+                }
             }
         }
+    }
+}
+
+/// Copy-paste setup for common MCP clients, so connecting doesn't mean hand-editing config.
+struct ConnectAIToolView: View {
+    let urls: [String]
+    @Environment(\.dismiss) private var dismiss
+
+    enum Client: String, CaseIterable, Identifiable {
+        case claudeCode = "Claude Code"
+        case claudeDesktop = "Claude Desktop"
+        case other = "Cursor / Other"
+        var id: String { rawValue }
+    }
+
+    @State private var client: Client = .claudeCode
+    @State private var url: String = ""
+    @State private var copied = false
+
+    private var snippet: String {
+        switch client {
+        case .claudeCode:
+            return "claude mcp add --transport http font-manager \(url)"
+        case .claudeDesktop:
+            // Claude Desktop launches local servers as commands; mcp-remote bridges to HTTP.
+            return """
+            {
+              "mcpServers": {
+                "font-manager": {
+                  "command": "npx",
+                  "args": ["-y", "mcp-remote", "\(url)", "--allow-http"]
+                }
+              }
+            }
+            """
+        case .other:
+            return """
+            {
+              "mcpServers": {
+                "font-manager": {
+                  "url": "\(url)"
+                }
+              }
+            }
+            """
+        }
+    }
+
+    private var instructions: String {
+        switch client {
+        case .claudeCode: return "Run this in Terminal (on the machine where you use Claude Code)."
+        case .claudeDesktop: return "In Claude Desktop, open Settings → Developer → Edit Config, and add this to claude_desktop_config.json. Requires Node.js. Restart Claude afterwards."
+        case .other: return "Add this to your tool's MCP configuration (e.g. Cursor: ~/.cursor/mcp.json)."
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Connect an AI Tool")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Picker("Tool", selection: $client) {
+                ForEach(Client.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            if urls.count > 1 {
+                Picker("Connect from", selection: $url) {
+                    ForEach(urls, id: \.self) { address in
+                        Text(address.contains("127.0.0.1") ? "This Mac" : "Another device on your Tailnet").tag(address)
+                    }
+                }
+            }
+
+            Text(instructions)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(snippet)
+                .font(.system(.callout, design: .monospaced))
+                .textSelection(.enabled)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+
+            HStack {
+                Button(copied ? "Copied" : "Copy") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(snippet, forType: .string)
+                    copied = true
+                }
+                .keyboardShortcut(.defaultAction)
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 520)
+        .onAppear { url = urls.first ?? "" }
+        .onChange(of: client) { _, _ in copied = false }
+        .onChange(of: url) { _, _ in copied = false }
     }
 }

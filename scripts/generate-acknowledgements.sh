@@ -20,6 +20,7 @@ mkdir -p "$(dirname "$OUT")"
 LIBS=(
   "woff2|https://github.com/google/woff2|ThirdParty/woff2"
   "Brotli|https://github.com/google/brotli|ThirdParty/brotli"
+  "Pirata One (font)|https://github.com/google/fonts/tree/main/ofl/pirataone|FontManager/Resources/Fonts/PirataOne"
   "MCP Swift SDK|https://github.com/modelcontextprotocol/swift-sdk|$CHECKOUTS/swift-sdk"
   "EventSource|https://github.com/mattt/EventSource|$CHECKOUTS/eventsource"
   "SwiftNIO|https://github.com/apple/swift-nio|$CHECKOUTS/swift-nio"
@@ -41,7 +42,7 @@ LIBS=(
     echo "$url"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     found=0
-    for f in "$dir"/LICENSE "$dir"/LICENSE.md "$dir"/LICENSE.txt "$dir"/NOTICE.txt; do
+    for f in "$dir"/LICENSE "$dir"/LICENSE.md "$dir"/LICENSE.txt "$dir"/OFL.txt "$dir"/NOTICE.txt; do
       [ -f "$f" ] || continue
       echo
       cat "$f"
