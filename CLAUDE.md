@@ -15,7 +15,8 @@ An actually good font management app for macOS.
 - Preview fonts with customizable sample text and sizes
 - Activate and deactivate fonts without deleting them
 - Search and filter by font name, family, style, or classification
-- Group fonts into user-made collections (sidebar; drag fonts onto a collection to add)
+- Collections in the sidebar: fixed (All / Active / Inactive / Missing Info), smart (rule-based,
+  live), and manual (drag fonts onto one to add)
 
 ## Architecture
 
@@ -45,7 +46,9 @@ FontManager/
 │   └── FontItem.swift              # FontItem and FontMember data models
 ├── Views/
 │   ├── ContentView.swift           # Main layout + drag-to-convert + toast
-│   ├── FontListView.swift          # Sidebar font list with search
+│   ├── FontListView.swift          # Filters sidebar: search, collections, Style/Width chips, Foundry list
+│   ├── FontListColumn.swift        # Font list shown between sidebar and detail once a font is open
+│   ├── SmartCollectionEditor.swift # Create/edit smart collection rules
 │   ├── FontDetailView.swift        # Detail pane: preview + Download menus
 │   ├── DirectoriesView.swift       # Browse fonts by source directory
 │   ├── ConversionToast.swift       # Progress/result toast
@@ -96,6 +99,15 @@ SF Symbols, so they take an explicit point size and don't auto-scale to font. Me
 checkmarks intentionally stay SF Symbols (`checkmark`) since macOS manages their layout.
 To add an icon: drop `assets/regular/<name>.svg` from `phosphor-icons/core` into a new
 `ph-<name>.imageset` and add a `Ph` case.
+
+## Layout
+
+Landing: filters sidebar + browse grid. Opening a font adds a persistent font list column
+(same filters and order as the grid, with a sticky "‹ All Fonts" back link, ⌘[) between the
+sidebar and the detail view. The sidebar holds only search, collections and filters; the
+Foundry list stretches to fill the remaining height (the sidebar falls back to scrolling as a
+whole only when the window is too short). Style/Width chip labels are set in representative
+system fonts (Pirata One for Blackletter) and optically centered from font metrics.
 
 ## Data and Preview mode
 

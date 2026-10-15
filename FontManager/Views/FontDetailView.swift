@@ -40,7 +40,6 @@ struct FontDetailView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                 VStack(alignment: .leading, spacing: 24) {
-                    BackToGridButton()
                     header
                     heroSpecimen
                 }
@@ -141,11 +140,13 @@ struct FontDetailView: View {
 
                 // Activate is the affirmative action (prominent accent); deactivating is
                 // reversible and harmless, so it's a plain button, not a red one.
-                if !font.canToggleActivation {
-                    Text("Managed by macOS")
+                if let note = font.activationNote {
+                    Text(note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .help("Installed in a macOS font folder — use Font Book to disable it.")
+                        .help(font.installLocation == .builtIn
+                              ? "Apple's built-in fonts are always available."
+                              : "macOS turns on every font in your Fonts folder. Move the file out of the Fonts folder, or use Font Book, to turn it off.")
                 } else if font.isActive {
                     Button("Deactivate") { fontService.toggleFont(font) }
                         .buttonStyle(.bordered)
@@ -456,8 +457,6 @@ struct MultiFontDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                BackToGridButton()
-
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("\(fonts.count) fonts selected")
@@ -517,7 +516,7 @@ struct MultiFontDetailView: View {
                     .disabled(!fonts.contains { !$0.exportableMembers.isEmpty })
 
                     // Only fonts this app registers can be toggled; hide the controls when
-                    // every selected font is managed by macOS.
+                    // every selected font is built into macOS or in a Fonts folder.
                     if fonts.contains(where: \.canToggleActivation) {
                         Button("Activate") { fontService.setActive(true, for: fonts) }
                             .buttonStyle(.borderedProminent)

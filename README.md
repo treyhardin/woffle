@@ -57,9 +57,12 @@ check finds one (toggle in **Settings → Updates**).
   values yourself (foundry with autocomplete against your existing names). Overrides live
   only in this app (font files are untouched), persist on-device, and revert per-field.
   A **Needs Style** toggle surfaces every font that still needs classifying.
-- **Collections** — group fonts for a project or client. Collections live in the sidebar;
-  add fonts by dragging them onto a collection or from the right-click menu, and activate or
-  deactivate a whole collection at once.
+- **Collections** — All Fonts, Active, Inactive, and Missing Info are built in. Make your own
+  for a project or client (drag fonts onto it, or right-click → Add to Collection), or a
+  **smart collection** that automatically includes every font matching rules you set — e.g.
+  Serif or Slab Serif, Condensed. Activate or deactivate a whole collection at once.
+- **Browse, then dig in** — the landing grid shows everything; open a font and a filtered font
+  list stays beside it, so you can step through fonts without going back.
 - **AI tools (MCP)** — connect Claude or other assistants to search your library, compare
   fonts, pull files converted for the web, read licensing info, and manage collections. For
   metadata cleanup they *suggest* edits, and you accept or reject them in Review Suggestions.
@@ -117,7 +120,8 @@ FontManager/
 │   └── FontItem.swift              # FontItem and FontMember data models
 ├── Views/
 │   ├── ContentView.swift           # Main layout + drag-to-convert + toast
-│   ├── FontListView.swift          # Sidebar font list with search
+│   ├── FontListView.swift          # Filters sidebar (search, collections, filters)
+│   ├── FontListColumn.swift        # Font list beside the detail view
 │   ├── FontDetailView.swift        # Detail pane: preview + Download menus
 │   ├── DirectoriesView.swift       # Browse fonts by source directory
 │   ├── ConversionToast.swift       # Progress/result toast

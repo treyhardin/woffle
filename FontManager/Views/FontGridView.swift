@@ -26,6 +26,7 @@ struct FontGridView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            AccessNeededBanner()
             GetStartedBanner()
             if fontService.filteredFonts.isEmpty {
                 emptyState
@@ -105,13 +106,20 @@ struct FontGridView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             if let collection = fontService.activeCollection, fontService.count(in: collection) == 0 {
-                PhIcon(.folderSimple, size: 40)
+                PhIcon(collection.isSmart ? .funnel : .folderSimple, size: 40)
                     .foregroundStyle(.tertiary)
-                Text("\(collection.name) is empty")
+                Text(collection.isSmart ? "No fonts match \(collection.name)" : "\(collection.name) is empty")
                     .font(.title3)
                     .foregroundStyle(.secondary)
-                Text("Drag fonts onto it in the sidebar, or right-click any font → Add to Collection.")
+                Text(collection.isSmart
+                     ? "Fonts matching its rules appear here automatically. Right-click it in the sidebar to edit the rules."
+                     : "Drag fonts onto it in the sidebar, or right-click any font → Add to Collection.")
                     .foregroundStyle(.tertiary)
+                if collection.isSmart {
+                    Button("Edit Smart Collection…") {
+                        fontService.smartCollectionEditor = SmartCollectionEditorRequest(collection: collection)
+                    }
+                }
             } else {
                 PhIcon(fontService.hasActiveFilters ? .funnel : .textAa, size: 40)
                     .foregroundStyle(.tertiary)

@@ -117,26 +117,80 @@ extension FontMember {
 }
 
 extension FontItem {
-    /// Only fonts this app registers — from source folders or imports — can be activated
-    /// and deactivated. Fonts in the macOS font folders are managed by macOS (Font Book).
-    var canToggleActivation: Bool { source != .system }
+    /// Where an installed (not source-folder) font comes from — decides how it's labeled and
+    /// whether it can be toggled.
+    enum InstallLocation {
+        /// Apple's bundled fonts (under /System) — always on.
+        case builtIn
+        /// Installed in a Fonts folder (~/Library/Fonts, /Library/Fonts) — macOS activates
+        /// everything there; remove the file or use Font Book to turn it off.
+        case fontsFolder
+        /// Activated from somewhere else by an app (e.g. this one, before its source folder
+        /// was readable) — can be deactivated like any source-folder font.
+        case activatedByApp
+    }
+
+    var installLocation: InstallLocation? {
+        guard source == .system else { return nil }
+        let paths = members.compactMap { $0.fileURL?.standardizedFileURL.path }
+        if paths.isEmpty || paths.contains(where: { $0.hasPrefix("/System/") }) { return .builtIn }
+        if paths.allSatisfy({ $0.contains("/Library/Fonts/") }) { return .fontsFolder }
+        return .activatedByApp
+    }
+
+    /// Fonts from source folders, imports, or activated by an app from elsewhere can be
+    /// toggled. Built-in and Fonts-folder fonts are managed by macOS.
+    var canToggleActivation: Bool {
+        installLocation.map { $0 == .activatedByApp } ?? true
+    }
+
+    /// Why a font can't be toggled, for labels and messages; nil when it can.
+    var activationNote: String? {
+        switch installLocation {
+        case .builtIn: return "Built into macOS"
+        case .fontsFolder: return "In your Fonts folder"
+        default: return nil
+        }
+    }
 
     var exportableMembers: [FontMember] { members.filter(\.isExportable) }
 }
 
-/// A user-made group of fonts. Members are family names (like overrides), so a collection
-/// survives re-scans and folder moves, and a family appears once however many sources
-/// provide it.
+/// A user-made group of fonts. Manual collections list their members as family names (like
+/// overrides), so they survive re-scans and folder moves. Smart collections have `rules`
+/// instead and include every font that matches them, updating live.
 struct FontCollection: Identifiable, Codable, Hashable {
     let id: UUID
     var name: String
     var families: [String]
+    /// Set for smart collections; nil for manual ones.
+    var rules: SmartCollectionRules?
 
-    init(name: String, families: [String] = []) {
+    var isSmart: Bool { rules != nil }
+
+    init(name: String, families: [String] = [], rules: SmartCollectionRules? = nil) {
         self.id = UUID()
         self.name = name
         self.families = families
+        self.rules = rules
     }
+}
+
+/// What a smart collection matches. Within a category any selected value matches ("Serif or
+/// Slab Serif"); categories combine with AND. An empty category means "any".
+struct SmartCollectionRules: Codable, Hashable {
+    var classifications: Set<FontClassification> = []
+    var widths: Set<FontWidth> = []
+    /// Display foundry names (as in the Foundry filter, including "Unknown").
+    var foundries: Set<String> = []
+
+    var isEmpty: Bool { classifications.isEmpty && widths.isEmpty && foundries.isEmpty }
+}
+
+/// Opens the smart collection editor: a new collection (`collection == nil`) or an existing one.
+struct SmartCollectionEditorRequest: Identifiable {
+    let id = UUID()
+    var collection: FontCollection?
 }
 
 /// A pending request for a collection name, answered by the name alert in ContentView.

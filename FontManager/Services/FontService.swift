@@ -28,6 +28,8 @@ class FontService: ObservableObject {
     }
     /// Attribute changes proposed by AI tools, awaiting review. Persisted.
     @Published var suggestions: [AttributeSuggestion] = []
+    /// Set to open the smart collection editor (new, or editing an existing one).
+    @Published var smartCollectionEditor: SmartCollectionEditorRequest?
     /// Set to ask the UI for a collection name (new or rename).
     @Published var collectionPrompt: CollectionPrompt?
     /// Incremented to request the search field take focus (Cmd+F).
@@ -235,8 +237,7 @@ class FontService: ObservableObject {
         var result = fonts
 
         if let collection = activeCollection {
-            let families = Set(collection.families)
-            result = result.filter { families.contains($0.familyName) }
+            result = result.filter { matches($0, collection) }
         }
 
         // Already-selected rows stay visible even after they stop matching, so editing a
@@ -372,7 +373,7 @@ class FontService: ObservableObject {
     func setActive(_ active: Bool, for items: [FontItem]) {
         let items = items.filter(\.canToggleActivation)
         guard !items.isEmpty else {
-            toast.flash("Fonts in the macOS font folders are managed by macOS.", isError: true)
+            toast.flash("These fonts are built into macOS or in your Fonts folder, so macOS keeps them on.", isError: true)
             return
         }
         var ok = 0
@@ -839,7 +840,7 @@ class FontService: ObservableObject {
     func deactivateFont(_ font: FontItem, notify: Bool = true) -> Bool {
         guard let index = fonts.firstIndex(where: { $0.id == font.id }) else { return false }
         guard font.canToggleActivation else {
-            if notify { toast.flash("“\(font.familyName)” is managed by macOS — use Font Book to disable it.", isError: true) }
+            if notify { toast.flash("“\(font.familyName)” is \(font.activationNote?.lowercased() ?? "managed by macOS") — macOS keeps it on.", isError: true) }
             return false
         }
         let urls = fileURLs(for: font)
@@ -871,7 +872,7 @@ class FontService: ObservableObject {
     @discardableResult
     func activateFont(_ font: FontItem, notify: Bool = true) -> Bool {
         guard let index = fonts.firstIndex(where: { $0.id == font.id }) else { return false }
-        guard font.canToggleActivation else { return true }   // macOS-managed fonts are always active
+        guard font.canToggleActivation else { return true }   // built-in / Fonts-folder fonts are always on
         let urls = fileURLs(for: font)
         guard !urls.isEmpty else {
             if notify { toast.flash("“\(font.familyName)” can't be activated (no font file).", isError: true) }

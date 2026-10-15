@@ -18,6 +18,15 @@ enum FontMCPActions {
         if service.collections.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
             return FontMCPTools.errorResult("A collection named '\(name)' already exists — use update_collection to add fonts to it.")
         }
+        if let rulesValue = args["rules"] {
+            switch parseRules(rulesValue) {
+            case .failure(let error): return FontMCPTools.errorResult(error.description)
+            case .success(let rules):
+                let collection = service.createSmartCollection(named: name, rules: rules)
+                return collectionResult(collection, service: service, unknown: [],
+                                        summary: "Created smart collection '\(collection.name)' — currently \(service.count(in: collection)) matching family(ies), updating automatically.")
+            }
+        }
         let (families, unknown) = resolveFamilies(FontMCPTools.stringArray(args["families"]), service: service)
         let collection = service.createCollection(named: name, families: families)
         return collectionResult(collection, service: service, unknown: unknown, summary: "Created collection '\(collection.name)' with \(families.count) family(ies).")
@@ -33,6 +42,25 @@ enum FontMCPActions {
             service.deleteCollection(collection.id)
             return FontMCPTools.encoded(["deleted": collection.name], summary: "Deleted collection '\(collection.name)' (its fonts stay in the library).")
         }
+        if collection.isSmart {
+            if args["add"] != nil || args["remove"] != nil {
+                return FontMCPTools.errorResult("'\(collection.name)' is a smart collection — its fonts come from its rules. Change `rules` instead of adding/removing families.")
+            }
+            var rules = collection.rules ?? SmartCollectionRules()
+            if let rulesValue = args["rules"] {
+                switch parseRules(rulesValue) {
+                case .failure(let error): return FontMCPTools.errorResult(error.description)
+                case .success(let parsed): rules = parsed
+                }
+            }
+            let newName = args["renameTo"]?.stringValue.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 } ?? collection.name
+            service.updateSmartCollection(collection.id, name: newName, rules: rules)
+            let updated = service.collections.first { $0.id == collection.id } ?? collection
+            return collectionResult(updated, service: service, unknown: [], summary: "Updated smart collection '\(updated.name)' — \(service.count(in: updated)) matching family(ies).")
+        }
+        if args["rules"] != nil {
+            return FontMCPTools.errorResult("'\(collection.name)' is a manual collection; `rules` only apply to smart collections. Create a smart collection with create_collection + rules.")
+        }
         let (add, unknownAdd) = resolveFamilies(FontMCPTools.stringArray(args["add"]), service: service)
         let (remove, unknownRemove) = resolveFamilies(FontMCPTools.stringArray(args["remove"]), service: service)
         if !add.isEmpty { service.addFamilies(add, to: collection.id) }
@@ -46,10 +74,40 @@ enum FontMCPActions {
     }
 
     private static func collectionResult(_ collection: FontCollection, service: FontService, unknown: [String], summary: String) -> CallTool.Result {
-        struct Result: Codable { let name: String; let families: [String]; let notFound: [String] }
+        struct Rules: Codable { let classifications, widths, foundries: [String] }
+        struct Result: Codable { let name: String; let smart: Bool; let rules: Rules?; let families: [String]; let notFound: [String] }
         var text = summary
         if !unknown.isEmpty { text += " Not found (skipped): \(unknown.joined(separator: ", "))." }
-        return FontMCPTools.encoded(Result(name: collection.name, families: collection.families, notFound: unknown), summary: text)
+        let rules = collection.rules.map {
+            Rules(classifications: $0.classifications.map(\.rawValue).sorted(), widths: $0.widths.map(\.rawValue).sorted(), foundries: $0.foundries.sorted())
+        }
+        let families = service.fonts(in: collection).map(\.familyName)
+        return FontMCPTools.encoded(Result(name: collection.name, smart: collection.isSmart, rules: rules, families: families, notFound: unknown), summary: text)
+    }
+
+    /// Parses `{ classifications?, widths?, foundries? }` (each an array; empty/missing = any).
+    private static func parseRules(_ value: Value) -> Result<SmartCollectionRules, RulesError> {
+        guard let obj = value.objectValue else { return .failure(RulesError("`rules` must be an object: { classifications?, widths?, foundries? }.")) }
+        var rules = SmartCollectionRules()
+        for raw in FontMCPTools.stringArray(obj["classifications"]) {
+            guard let c = FontClassification.allCases.first(where: { $0.rawValue.caseInsensitiveCompare(raw) == .orderedSame }) else {
+                return .failure(RulesError("Unknown classification '\(raw)'."))
+            }
+            rules.classifications.insert(c)
+        }
+        for raw in FontMCPTools.stringArray(obj["widths"]) {
+            guard let w = FontWidth.allCases.first(where: { $0.rawValue.caseInsensitiveCompare(raw) == .orderedSame }) else {
+                return .failure(RulesError("Unknown width '\(raw)'."))
+            }
+            rules.widths.insert(w)
+        }
+        rules.foundries = Set(FontMCPTools.stringArray(obj["foundries"]))
+        return .success(rules)
+    }
+
+    struct RulesError: Error, CustomStringConvertible {
+        let description: String
+        init(_ description: String) { self.description = description }
     }
 
     // MARK: - Activation
@@ -71,7 +129,7 @@ enum FontMCPActions {
         for family in families {
             guard let font = service.fonts.first(where: { $0.familyName == family && $0.canToggleActivation }) else {
                 let current = service.fonts.first { $0.familyName == family }
-                outcomes.append(Outcome(family: family, active: current?.isActive ?? true, note: "managed by macOS (installed in a system font folder) — can't be toggled"))
+                outcomes.append(Outcome(family: family, active: current?.isActive ?? true, note: "\(current?.activationNote ?? "managed by macOS") — macOS keeps it on; can't be toggled"))
                 continue
             }
             let ok = active ? service.activateFont(font, notify: false) : service.deactivateFont(font, notify: false)

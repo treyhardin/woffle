@@ -32,6 +32,8 @@ enum Ph: String {
     case folderSimple = "ph-folder-simple"
     case folderSimplePlus = "ph-folder-simple-plus"
     case caretDown = "ph-caret-down"
+    case square = "ph-square"
+    case checkSquare = "ph-check-square"
 
     var image: Image { Image(rawValue).renderingMode(.template) }
 }

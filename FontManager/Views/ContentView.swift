@@ -33,20 +33,32 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView(columnVisibility: .constant(.all)) {
             FontListView()
-                .navigationSplitViewColumnWidth(min: 264, ideal: 280, max: 360)
+                // The sidebar's content (chips, scrolling lists) has no natural width, so pin
+                // the minimum on the content too — the column width alone isn't enforced.
+                .frame(minWidth: 280)
+                .navigationSplitViewColumnWidth(min: 280, ideal: 300, max: 380)
                 .toolbar(removing: .sidebarToggle)
         } detail: {
             ZStack {
-                switch selectedFonts.count {
-                case 0:
+                if selectedFonts.isEmpty {
                     FontGridView()
                         .transition(browseTransition)
-                case 1:
-                    FontDetailView(font: selectedFonts[0])
-                        .transition(detailTransition)
-                default:
-                    MultiFontDetailView(fonts: selectedFonts)
-                        .transition(detailTransition)
+                } else {
+                    // Opening a font adds the font list column between filters and detail.
+                    HStack(spacing: 0) {
+                        FontListColumn()
+                            .frame(width: 280)
+                        Divider()
+                        Group {
+                            if selectedFonts.count == 1 {
+                                FontDetailView(font: selectedFonts[0])
+                            } else {
+                                MultiFontDetailView(fonts: selectedFonts)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .transition(detailTransition)
                 }
             }
             // Animate only moving between All Fonts and a detail view — switching fonts
@@ -54,7 +66,7 @@ struct ContentView: View {
             .animation(reduceMotion ? .easeInOut(duration: 0.15) : .smooth(duration: 0.28),
                        value: selectedFonts.isEmpty)
         }
-        .frame(minWidth: 820, minHeight: 460)
+        .frame(minWidth: 980, minHeight: 460)
         .toolbar {
             // The badge keeps its own prominent fill — hide the shared glass container
             // macOS Tahoe would otherwise draw around the toolbar item.
@@ -111,6 +123,10 @@ struct ContentView: View {
         .toolbarRole(.editor)
         .navigationTitle(fontService.activeCollection?.name ?? "Font Manager")
         .modifier(CollectionNameAlert())
+        .sheet(item: $fontService.smartCollectionEditor) { request in
+            SmartCollectionEditor(existing: request.collection)
+                .environmentObject(fontService)
+        }
         .sheet(isPresented: $showingDirectories) {
             DirectoriesView()
         }

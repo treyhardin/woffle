@@ -361,12 +361,13 @@ actor FontMCPServer {
         ),
         Tool(
             name: "create_collection",
-            description: "Creates a collection (a named group of fonts shown in the app's sidebar), optionally with families. Requires \"Allow changes\".",
+            description: "Creates a collection shown in the app's sidebar: a manual one (pass `families`) or a smart one (pass `rules`, e.g. all Serif + Slab Serif that are Condensed). Requires \"Allow changes\".",
             inputSchema: [
                 "type": "object",
                 "properties": [
                     "name": ["type": "string"],
-                    "families": ["type": "array", "items": ["type": "string"], "description": "Family names to include."],
+                    "families": ["type": "array", "items": ["type": "string"], "description": "Family names to include (manual collection)."],
+                    "rules": ["type": "object", "description": "Makes it a SMART collection: every font matching these rules is included automatically and stays current. Within a list any value matches; lists combine with AND; omit a list for 'any'.", "properties": ["classifications": ["type": "array", "items": ["type": "string"]], "widths": ["type": "array", "items": ["type": "string"]], "foundries": ["type": "array", "items": ["type": "string"]]], "additionalProperties": false],
                 ],
                 "required": ["name"],
                 "additionalProperties": false,
@@ -374,7 +375,7 @@ actor FontMCPServer {
         ),
         Tool(
             name: "update_collection",
-            description: "Adds/removes families, renames, or deletes a collection (deleting never removes fonts from the library). Requires \"Allow changes\".",
+            description: "Adds/removes families (manual collections), replaces `rules` (smart collections), renames, or deletes a collection (deleting never removes fonts from the library). Requires \"Allow changes\".",
             inputSchema: [
                 "type": "object",
                 "properties": [
@@ -383,6 +384,7 @@ actor FontMCPServer {
                     "remove": ["type": "array", "items": ["type": "string"]],
                     "renameTo": ["type": "string"],
                     "delete": ["type": "boolean"],
+                    "rules": ["type": "object", "description": "Smart collections only: replaces the rules. Within a list any value matches; lists combine with AND; omit a list for 'any'.", "properties": ["classifications": ["type": "array", "items": ["type": "string"]], "widths": ["type": "array", "items": ["type": "string"]], "foundries": ["type": "array", "items": ["type": "string"]]], "additionalProperties": false],
                 ],
                 "required": ["name"],
                 "additionalProperties": false,

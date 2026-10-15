@@ -140,3 +140,37 @@ struct GetStartedBanner: View {
         }
     }
 }
+
+/// Shown above the browse grid when a source folder can't be read — in the sandboxed App
+/// Store build a folder needs a one-time grant (e.g. after switching from the open-source
+/// build). Without this, the folder's fonts silently vanish from the library.
+struct AccessNeededBanner: View {
+    @EnvironmentObject var fontService: FontService
+
+    var body: some View {
+        if let path = fontService.customDirectories.first(where: { !fontService.canRead(directory: $0) }) {
+            let unreadable = fontService.customDirectories.filter { !fontService.canRead(directory: $0) }.count
+            HStack(spacing: 14) {
+                PhIcon(.warning, size: 24)
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(unreadable == 1
+                         ? "Font Manager can't read “\(URL(fileURLWithPath: path).lastPathComponent)”"
+                         : "Font Manager can't read \(unreadable) of your font folders")
+                        .fontWeight(.semibold)
+                    Text("macOS needs your permission once before Font Manager can show the fonts in it.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 12)
+                Button("Grant Access…") { fontService.grantAccess(to: path) }
+                    .buttonStyle(.borderedProminent)
+            }
+            .padding(14)
+            .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.orange.opacity(0.3), lineWidth: 1))
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+        }
+    }
+}

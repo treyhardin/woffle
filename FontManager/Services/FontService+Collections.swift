@@ -8,20 +8,49 @@ extension FontService {
         return collections.first { $0.id == activeCollectionID }
     }
 
+    /// Whether a font belongs to the collection: listed (manual) or matching its rules (smart).
+    func matches(_ font: FontItem, _ collection: FontCollection) -> Bool {
+        guard let rules = collection.rules else { return collection.families.contains(font.familyName) }
+        return matches(font, rules)
+    }
+
+    func matches(_ font: FontItem, _ rules: SmartCollectionRules) -> Bool {
+        (rules.classifications.isEmpty || rules.classifications.contains(effectiveClassification(font)))
+            && (rules.widths.isEmpty || rules.widths.contains(effectiveWidth(font)))
+            && (rules.foundries.isEmpty || rules.foundries.contains(displayFoundry(font)))
+    }
+
     /// Library fonts belonging to the collection.
     func fonts(in collection: FontCollection) -> [FontItem] {
-        let families = Set(collection.families)
-        return fonts.filter { families.contains($0.familyName) }
+        fonts.filter { matches($0, collection) }
     }
 
     func collections(containing font: FontItem) -> [FontCollection] {
-        collections.filter { $0.families.contains(font.familyName) }
+        collections.filter { matches(font, $0) }
     }
 
-    /// Families in the collection that are currently in the library (for sidebar counts).
+    /// Library fonts in the collection (for sidebar counts).
     func count(in collection: FontCollection) -> Int {
+        if collection.isSmart { return fonts(in: collection).count }
         let present = Set(fonts.map(\.familyName))
         return Set(collection.families).intersection(present).count
+    }
+
+    var manualCollections: [FontCollection] { collections.filter { !$0.isSmart } }
+
+    @discardableResult
+    func createSmartCollection(named name: String, rules: SmartCollectionRules) -> FontCollection {
+        let collection = FontCollection(name: Self.cleanName(name), rules: rules)
+        collections.append(collection)
+        saveCollections()
+        return collection
+    }
+
+    func updateSmartCollection(_ id: UUID, name: String, rules: SmartCollectionRules) {
+        guard let index = collections.firstIndex(where: { $0.id == id }), collections[index].isSmart else { return }
+        collections[index].name = Self.cleanName(name)
+        collections[index].rules = rules
+        saveCollections()
     }
 
     @discardableResult
@@ -48,7 +77,7 @@ extension FontService {
     }
 
     func addFamilies(_ families: [String], to id: UUID) {
-        guard let index = collections.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = collections.firstIndex(where: { $0.id == id }), !collections[index].isSmart else { return }
         for family in families where !collections[index].families.contains(family) {
             collections[index].families.append(family)
         }
@@ -58,7 +87,7 @@ extension FontService {
     }
 
     func removeFamilies(_ families: [String], from id: UUID) {
-        guard let index = collections.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = collections.firstIndex(where: { $0.id == id }), !collections[index].isSmart else { return }
         collections[index].families.removeAll { families.contains($0) }
         saveCollections()
     }

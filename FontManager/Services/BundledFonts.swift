@@ -14,7 +14,10 @@ enum BundledFonts {
 
     /// Pirata One (SIL Open Font License) — the Blackletter label, since macOS has none.
     static func pirataOne(size: CGFloat) -> Font {
-        guard let descriptor = pirataDescriptor else { return .system(size: size, weight: .heavy, design: .serif) }
-        return Font(CTFontCreateWithFontDescriptor(descriptor, size, nil))
+        pirataOneCTFont(size: size).map { Font($0) } ?? .system(size: size, weight: .heavy, design: .serif)
+    }
+
+    static func pirataOneCTFont(size: CGFloat) -> CTFont? {
+        pirataDescriptor.map { CTFontCreateWithFontDescriptor($0, size, nil) }
     }
 }
