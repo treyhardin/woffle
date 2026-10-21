@@ -68,13 +68,13 @@ targets:
         NSHumanReadableCopyright: "© 2026 Trey Hardin · MIT Licensed"
         ITSAppUsesNonExemptEncryption: false
         # Sparkle auto-update
-        SUFeedURL: "https://github.com/treyhardin/font-manager/releases/latest/download/appcast.xml"
+        SUFeedURL: "https://github.com/treyhardin/woffle/releases/latest/download/appcast.xml"
         SUPublicEDKey: "m/iJK41QKnw6jETwwNI/u7nedlGifF6y8VaDi9e2LpY="
         SUEnableAutomaticChecks: true
     settings:
       base: &appSettings
-        PRODUCT_BUNDLE_IDENTIFIER: co.trumancreative.FontManager
-        PRODUCT_NAME: Font Manager
+        PRODUCT_BUNDLE_IDENTIFIER: co.trumancreative.Woffle
+        PRODUCT_NAME: Woffle
         MARKETING_VERSION: "1.4.0"
         CURRENT_PROJECT_VERSION: 5
         SWIFT_VERSION: "6.0"
@@ -89,8 +89,8 @@ targets:
         # "Preview": its own identity and a throwaway data folder, wiped every launch
         # (see AppEnvironment) — for testing first-run flows without touching real data.
         Debug:
-          PRODUCT_BUNDLE_IDENTIFIER: co.trumancreative.FontManager.preview
-          PRODUCT_NAME: Font Manager (Preview)
+          PRODUCT_BUNDLE_IDENTIFIER: co.trumancreative.Woffle.preview
+          PRODUCT_NAME: Woffle (Preview)
     entitlements:
       path: FontManager/FontManager.entitlements
       properties:
@@ -126,7 +126,7 @@ targets:
         # Distinct name for local runs so it doesn't overwrite the open-source Debug app
         # (and is easy to tell apart). Release/archive keeps the real name.
         Debug:
-          PRODUCT_NAME: Font Manager (App Store)
+          PRODUCT_NAME: Woffle (App Store)
     entitlements:
       path: FontManager/FontManager-AppStore.entitlements
       properties:

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Builds a universal, release-configured Font Manager, packages it as a .dmg,
+# Builds a universal, release-configured Woffle, packages it as a .dmg,
 # and generates the EdDSA-signed Sparkle appcast — ready to upload to a GitHub Release.
 #
 # Usage:  scripts/release.sh
@@ -12,18 +12,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-APP_NAME="Font Manager"
+APP_NAME="Woffle"
 SCHEME="FontManager"
 DIST="dist"
 ARCHIVE="$DIST/FontManager.xcarchive"
 STAGING="$DIST/staging"
 UPDATES="$DIST/updates"
-REPO="treyhardin/font-manager"
+REPO="treyhardin/woffle"
 
 VERSION="$(grep 'MARKETING_VERSION:' project.yml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
-DMG="$UPDATES/Font-Manager-$VERSION.dmg"
+DMG="$UPDATES/Woffle-$VERSION.dmg"
 
-echo "▸ Releasing Font Manager $VERSION"
+echo "▸ Releasing Woffle $VERSION"
 rm -rf "$DIST"
 mkdir -p "$STAGING" "$UPDATES"
 
@@ -66,7 +66,7 @@ echo "Next — publish the GitHub Release (review first):"
 echo "  gh release create v$VERSION \\"
 echo "    \"$DMG\" \\"
 echo "    \"$UPDATES/appcast.xml\" \\"
-echo "    --title \"Font Manager $VERSION\" --notes \"…release notes…\""
+echo "    --title \"Woffle $VERSION\" --notes \"…release notes…\""
 echo
 echo "NOTARIZE (optional, removes the Gatekeeper warning — needs an Apple Developer ID):"
 echo "  1) Sign with Developer ID instead of \"-\":  CODE_SIGN_IDENTITY=\"Developer ID Application: <NAME> (<TEAMID>)\" + --options runtime"

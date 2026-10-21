@@ -99,7 +99,7 @@ struct DirectoryRow: View {
             } else {
                 PhIcon(.warning, size: 14)
                     .foregroundStyle(.orange)
-                    .help("Font Manager doesn't have permission to read this folder.")
+                    .help("Woffle doesn't have permission to read this folder.")
                 Button("Grant Access…") { fontService.grantAccess(to: path) }
                     .controlSize(.small)
             }

@@ -1,4 +1,4 @@
-Font Manager includes the following open-source software. Thank you to its authors.
+Woffle includes the following open-source software. Thank you to its authors.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

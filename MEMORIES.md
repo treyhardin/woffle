@@ -7,7 +7,7 @@
 - Distributed unsigned as a `.dmg` from GitHub Releases; notarization deferred until an Apple Developer ID is available.
 - Auto-updates via Sparkle with EdDSA-signed appcast at `…/releases/latest/download/appcast.xml`.
 - `.xcodeproj` is gitignored and generated from `project.yml` via XcodeGen.
-- Style/Width overrides live only in the app (UserDefaults / `~/Library/Application Support/Font Manager/`); font files are never modified.
+- Style/Width overrides live only in the app (UserDefaults / `~/Library/Application Support/Woffle/`); font files are never modified.
 - No analytics or tracking; the only network request is the Sparkle update check (toggleable in Settings → Updates).
 
 ## Useful Details
@@ -16,7 +16,7 @@
 - Single faces are extracted from any container (`.ttc`/`.dfont`) via `CTFontCopyTable`.
 - WOFF uses the Compression framework (zlib); WOFF2 uses vendored Google woff2 + brotli via the `WOFF2Kit` C++ shim (bridging header exposes it to Swift).
 - Imported fonts tracked in UserDefaults, re-activated on launch (`FontSource.imported`).
-- Homebrew cask at `Casks/font-manager.rb`; install requires `--no-quarantine` while unsigned.
+- Homebrew cask at `Casks/woffle.rb`; install requires `--no-quarantine` while unsigned.
 - Targets macOS 14.0+, Swift 6.
 - App is MIT-licensed (`LICENSE`, © 2026 Trey Hardin); vendored woff2 and brotli are also MIT.
 

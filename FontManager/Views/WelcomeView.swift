@@ -2,7 +2,7 @@ import SwiftUI
 
 /// First-launch welcome: what the app does, then one clear next step — pointing it at a
 /// font folder (which, in the sandboxed App Store build, is also how access is granted).
-/// Reopen any time from Help → Welcome to Font Manager.
+/// Reopen any time from Help → Welcome to Woffle.
 struct WelcomeView: View {
     @EnvironmentObject var fontService: FontService
     @Environment(\.dismiss) private var dismiss
@@ -13,7 +13,7 @@ struct WelcomeView: View {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
                     .frame(width: 80, height: 80)
-                Text("Welcome to Font Manager")
+                Text("Welcome to Woffle")
                     .font(.title)
                     .fontWeight(.bold)
                 Text("Your entire font library — on this Mac or a network drive — organized your way.")
@@ -57,7 +57,7 @@ struct WelcomeView: View {
                     .buttonStyle(.borderless)
                     .keyboardShortcut(.cancelAction)
 
-                Text("Font Manager only reads the folders you choose and never changes your font files. Nothing leaves your Mac unless you connect an AI tool.")
+                Text("Woffle only reads the folders you choose and never changes your font files. Nothing leaves your Mac unless you connect an AI tool.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
@@ -155,10 +155,10 @@ struct AccessNeededBanner: View {
                     .foregroundStyle(.orange)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(unreadable == 1
-                         ? "Font Manager can't read “\(URL(fileURLWithPath: path).lastPathComponent)”"
-                         : "Font Manager can't read \(unreadable) of your font folders")
+                         ? "Woffle can't read “\(URL(fileURLWithPath: path).lastPathComponent)”"
+                         : "Woffle can't read \(unreadable) of your font folders")
                         .fontWeight(.semibold)
-                    Text("macOS needs your permission once before Font Manager can show the fonts in it.")
+                    Text("macOS needs your permission once before Woffle can show the fonts in it.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }

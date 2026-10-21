@@ -811,7 +811,7 @@ class FontService: ObservableObject {
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: path)
         panel.prompt = "Grant Access"
-        panel.message = "Select “\(URL(fileURLWithPath: path).lastPathComponent)” so Font Manager can read its fonts."
+        panel.message = "Select “\(URL(fileURLWithPath: path).lastPathComponent)” so Woffle can read its fonts."
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         directoryAccess.remove(path)

@@ -92,7 +92,7 @@ struct UpdateAvailableButton: View {
                 .accessibilityElement(children: .combine)
             }
             .buttonStyle(.plain)
-            .help(model.pendingVersion.map { "Font Manager \($0) is available — click to install" }
+            .help(model.pendingVersion.map { "Woffle \($0) is available — click to install" }
                 ?? "A new version is available — click to install")
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
         }

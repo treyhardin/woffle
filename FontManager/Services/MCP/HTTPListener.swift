@@ -3,7 +3,7 @@ import Network
 import OSLog
 import MCP
 
-private let mcpLog = Logger(subsystem: "co.trumancreative.FontManager", category: "mcp")
+private let mcpLog = Logger(subsystem: "co.trumancreative.Woffle", category: "mcp")
 
 /// A minimal HTTP/1.1 listener built on Network.framework.
 ///
@@ -21,7 +21,7 @@ final class HTTPListener: @unchecked Sendable {
     private let host: String
     private let port: UInt16
     private let handler: Handler
-    private let queue = DispatchQueue(label: "co.trumancreative.FontManager.mcp.http")
+    private let queue = DispatchQueue(label: "co.trumancreative.Woffle.mcp.http")
     private var listener: NWListener?
 
     /// Max request body we'll accept, guards against unbounded buffering.

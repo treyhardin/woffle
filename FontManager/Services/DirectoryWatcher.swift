@@ -7,7 +7,7 @@ import CoreServices
 final class DirectoryWatcher {
     private var stream: FSEventStreamRef?
     private let onChange: () -> Void
-    private let queue = DispatchQueue(label: "co.trumancreative.FontManager.DirectoryWatcher")
+    private let queue = DispatchQueue(label: "co.trumancreative.Woffle.DirectoryWatcher")
 
     init(onChange: @escaping () -> Void) {
         self.onChange = onChange

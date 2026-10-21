@@ -1,28 +1,28 @@
-# Font Manager
+# Woffle
 
-An actually good font management app for macOS.
+An actually good font management app for macOS — by [Truman Creative](https://trumancreative.co). [woffle.io](https://woffle.io)
 
-Font Manager is a native macOS app for browsing, previewing, and activating or
+Woffle is a native macOS app for browsing, previewing, and activating or
 deactivating the fonts on your system — without deleting them. It's built with
 SwiftUI and talks directly to Core Text and AppKit for font enumeration and
 activation.
 
 ## Install
 
-Download the latest **`Font-Manager-x.y.z.dmg`** from the
-[Releases page](https://github.com/treyhardin/font-manager/releases), open it, and
-drag **Font Manager** to your Applications folder.
+Download the latest **`Woffle-x.y.z.dmg`** from the
+[Releases page](https://github.com/treyhardin/woffle/releases), open it, and
+drag **Woffle** to your Applications folder.
 
 > **First launch:** the app isn't yet notarized by Apple, so macOS will warn that it
 > "can't be opened." Right-click the app → **Open** (then **Open** again), or go to
 > **System Settings → Privacy & Security → Open Anyway**. You only need to do this once.
 > If macOS says the app is "damaged," clear the quarantine flag:
-> `xattr -dr com.apple.quarantine "/Applications/Font Manager.app"`
+> `xattr -dr com.apple.quarantine "/Applications/Woffle.app"`
 
 **Homebrew** (once a tap is published):
 
 ```sh
-brew install --cask --no-quarantine treyhardin/tap/font-manager
+brew install --cask --no-quarantine treyhardin/tap/woffle
 ```
 
 `--no-quarantine` skips the Gatekeeper prompt above while the app is unsigned.
@@ -171,16 +171,16 @@ resolves). Sparkle signing keys are created once with `scripts/generate-keys.sh`
 
 ## Privacy
 
-Font Manager collects **no** data — no analytics, no tracking, no accounts. The only
+Woffle collects **no** data — no analytics, no tracking, no accounts. The only
 network request it makes is an **update check** against this repo's releases, which you
 can turn off in **Settings → Updates**. The optional MCP server (off by default) accepts
 connections only from this Mac and your own Tailscale network; it sends nothing anywhere
 on its own. Your font files are never modified, and Style/Width
-overrides are stored locally in `~/Library/Application Support/Font Manager/`.
+overrides are stored locally in `~/Library/Application Support/Woffle/`.
 
 ## License
 
-Font Manager is released under the [MIT License](LICENSE). Bundled third-party code keeps its own licenses:
+Woffle is released under the [MIT License](LICENSE). Bundled third-party code keeps its own licenses:
 [`woff2`](ThirdParty/woff2/LICENSE) (MIT) and
 [`brotli`](ThirdParty/brotli/LICENSE) (MIT).
 

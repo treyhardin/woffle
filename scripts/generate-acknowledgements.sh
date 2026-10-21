@@ -32,7 +32,7 @@ LIBS=(
 )
 
 {
-  echo "Font Manager includes the following open-source software. Thank you to its authors."
+  echo "Woffle includes the following open-source software. Thank you to its authors."
   for entry in "${LIBS[@]}"; do
     IFS='|' read -r name url dir <<< "$entry"
     echo

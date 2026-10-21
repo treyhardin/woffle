@@ -2,7 +2,7 @@ import Foundation
 import TipKit
 
 /// Where the app keeps its data, and the throwaway "Preview" mode used by the open-source
-/// Debug build ("Font Manager (Preview)", its own bundle ID): every launch starts from a
+/// Debug build ("Woffle (Preview)", its own bundle ID): every launch starts from a
 /// clean slate — settings, collections, edits and tips are wiped — so first-run flows can
 /// be tested. The App Store build (and open-source Release) persist normally.
 enum AppEnvironment {
@@ -15,9 +15,9 @@ enum AppEnvironment {
     /// Folder for overrides.json / collections.json.
     static var supportDirectory: URL {
         let base = isPreview
-            ? FileManager.default.temporaryDirectory.appendingPathComponent("FontManagerPreview", isDirectory: true)
+            ? FileManager.default.temporaryDirectory.appendingPathComponent("WofflePreview", isDirectory: true)
             : FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Font Manager", isDirectory: true)
+                .appendingPathComponent("Woffle", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base
     }

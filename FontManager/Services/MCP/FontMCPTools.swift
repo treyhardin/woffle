@@ -204,7 +204,7 @@ enum FontMCPTools {
         #if APPSTORE
         // The sandbox only allows writing into folders the user granted.
         if let destination, !isWritableInSandbox(destination) {
-            return errorResult("`destination` must be inside the Delivery Folder set in Font Manager (Settings → MCP Server) or one of its source folders. Omit `destination` to receive the font bytes instead.")
+            return errorResult("`destination` must be inside the Delivery Folder set in Woffle (Settings → MCP Server) or one of its source folders. Omit `destination` to receive the font bytes instead.")
         }
         #endif
         let includeCSS = args["includeCSS"]?.boolValue ?? true

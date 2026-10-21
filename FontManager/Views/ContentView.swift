@@ -121,7 +121,7 @@ struct ContentView: View {
             }
         }
         .toolbarRole(.editor)
-        .navigationTitle(fontService.activeCollection?.name ?? "Font Manager")
+        .navigationTitle(fontService.activeCollection?.name ?? "Woffle")
         .modifier(CollectionNameAlert())
         .sheet(item: $fontService.smartCollectionEditor) { request in
             SmartCollectionEditor(existing: request.collection)

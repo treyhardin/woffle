@@ -1,6 +1,13 @@
-# font-manager
+# Woffle
 
-An actually good font management app for macOS.
+An actually good font management app for macOS — "Woffle by Truman Creative" (woffle.io).
+The name nods to WOFF, the web font format.
+
+**Naming:** the product is Woffle everywhere users see it (app name, bundle IDs
+`co.trumancreative.Woffle` / `.Woffle.preview`, MCP server name `woffle`, repo, cask,
+Sparkle feed). Internal names were left as-is on purpose — Xcode project/targets
+`FontManager` / `FontManagerAppStore`, the `FontManager/` source folder, and type names —
+so builds/scripts reference those.
 
 ## Tech Stack
 
@@ -112,13 +119,13 @@ system fonts (Pirata One for Blackletter) and optically centered from font metri
 ## Data and Preview mode
 
 The **App Store build is the maintainer's real-data app** during development (sandbox
-container `~/Library/Containers/co.trumancreative.FontManager`). The **open-source Debug
-build is "Font Manager (Preview)"** (bundle ID `co.trumancreative.FontManager.preview`): it
+container `~/Library/Containers/co.trumancreative.Woffle`). The **open-source Debug
+build is "Woffle (Preview)"** (bundle ID `co.trumancreative.Woffle.preview`): it
 wipes its settings, collections, edits, suggestions and tips on every launch
 (`AppEnvironment.resetIfPreview`) — for testing first-run flows. Font activation is
 system-wide in macOS, so Preview's activations are real. To test MCP in Preview without
 persisting anything, pass settings as launch arguments:
-`open "Font Manager (Preview).app" --args -mcp.enabled YES -mcp.port 8789 -mcp.allowWrites YES`.
+`open "Woffle (Preview).app" --args -mcp.enabled YES -mcp.port 8789 -mcp.allowWrites YES`.
 
 ## Two builds
 
@@ -127,7 +134,7 @@ One codebase, two app targets in `project.yml` (sources shared):
 - **`FontManager`** — open-source build (GitHub download / Homebrew). Not sandboxed;
   Sparkle auto-updates; `scripts/release.sh`.
 - **`FontManagerAppStore`** — Mac App Store build. Sandboxed, no Sparkle (the App Store
-  updates it), `APPSTORE` compile flag. Debug builds are named "Font Manager (App Store)"
+  updates it), `APPSTORE` compile flag. Debug builds are named "Woffle (App Store)"
   so they don't overwrite the other app; Release keeps the real name.
 
 Put anything build-specific behind `#if APPSTORE`; prefer shared code that works in both
@@ -243,6 +250,6 @@ To regenerate it after a fresh clone: `xcodegen generate`.
   EdDSA-signed). The signing **private key lives in the maintainer's login Keychain** —
   back it up; without it you can't sign updates existing users will accept.
 - `scripts/release.sh` builds a universal `.dmg` + signed appcast; `scripts/generate-keys.sh`
-  creates the Sparkle key (one-time). Homebrew cask in `Casks/font-manager.rb`.
+  creates the Sparkle key (one-time). Homebrew cask in `Casks/woffle.rb`.
 
 Update this file as the project evolves.

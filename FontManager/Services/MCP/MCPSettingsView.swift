@@ -14,7 +14,7 @@ struct MCPSettingsView: View {
                 get: { mcp.isEnabled },
                 set: { mcp.isEnabled = $0 }
             ))
-            Text("Lets AI tools on this machine or your Tailnet browse and pull fonts. Runs only while Font Manager is open.")
+            Text("Lets AI tools on this machine or your Tailnet browse and pull fonts. Runs only while Woffle is open.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -103,13 +103,13 @@ struct ConnectAIToolView: View {
     private var snippet: String {
         switch client {
         case .claudeCode:
-            return "claude mcp add --transport http font-manager \(url)"
+            return "claude mcp add --transport http woffle \(url)"
         case .claudeDesktop:
             // Claude Desktop launches local servers as commands; mcp-remote bridges to HTTP.
             return """
             {
               "mcpServers": {
-                "font-manager": {
+                "woffle": {
                   "command": "npx",
                   "args": ["-y", "mcp-remote", "\(url)", "--allow-http"]
                 }
@@ -120,7 +120,7 @@ struct ConnectAIToolView: View {
             return """
             {
               "mcpServers": {
-                "font-manager": {
+                "woffle": {
                   "url": "\(url)"
                 }
               }

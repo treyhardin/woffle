@@ -97,7 +97,7 @@ actor FontMCPServer {
         await teardownServer()
 
         let server = Server(
-            name: "Font Manager",
+            name: "Woffle",
             version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0",
             capabilities: .init(tools: .init(listChanged: false))
         )
@@ -149,7 +149,7 @@ actor FontMCPServer {
             if Self.changeTools.contains(params.name) {
                 guard UserDefaults.standard.bool(forKey: "mcp.allowWrites") else {
                     return CallTool.Result(
-                        content: [.text("Changes from AI tools are turned off. Use suggest_font_attributes to propose edits for the user to review, or ask them to enable Font Manager → Settings → MCP Server → \"Allow changes\".")],
+                        content: [.text("Changes from AI tools are turned off. Use suggest_font_attributes to propose edits for the user to review, or ask them to enable Woffle → Settings → MCP Server → \"Allow changes\".")],
                         isError: true
                     )
                 }

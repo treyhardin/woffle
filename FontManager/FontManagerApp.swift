@@ -54,7 +54,7 @@ struct FontManagerApp: App {
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .help) {
-                Button("Welcome to Font Manager") {
+                Button("Welcome to Woffle") {
                     UserDefaults.standard.set(false, forKey: WelcomeView.hasSeenKey)
                 }
                 Divider()

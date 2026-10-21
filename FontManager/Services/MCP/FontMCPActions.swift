@@ -171,7 +171,7 @@ enum FontMCPActions {
         let result = Result(queued: outcome.queued,
                             skipped: outcome.skipped.map { Skip(family: $0.family, field: $0.field, reason: $0.reason) },
                             pendingTotal: service.pendingSuggestions.count)
-        return FontMCPTools.encoded(result, summary: "Queued \(outcome.queued) suggestion(s) for review. Ask the user to open Font Manager → Review Suggestions to accept or reject them; check outcomes with list_suggestions.")
+        return FontMCPTools.encoded(result, summary: "Queued \(outcome.queued) suggestion(s) for review. Ask the user to open Woffle → Review Suggestions to accept or reject them; check outcomes with list_suggestions.")
     }
 
     static func listSuggestions(_ args: [String: Value], service: FontService) -> CallTool.Result {
